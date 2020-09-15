@@ -140,9 +140,10 @@ class Memory():
         batch_size (int): The number of elements to include in a replay batch.
         gamma (float): The "discount rate" used to assess Q values.
     """
-    def __init__(self, memory_size, batch_size, gamma):
+    def __init__(self, memory_size, batch_size, sequence_size, gamma):
         self.buffer = deque(maxlen=memory_size)
         self.batch_size = batch_size
+        self.sequence_size = sequence_size
         self.gamma = gamma
 
     def add(self, experience):
@@ -166,6 +167,7 @@ class Memory():
             ]
         """
         buffer_size = len(self.buffer)        
+        num_sequence = math.ceil(self.batch_size, self.sequence_size)
         index = np.random.choice(
             np.arange(buffer_size), size=self.batch_size, replace=False)
 
@@ -208,22 +210,24 @@ class Environment():
         
         self.start_timedelta_index = np.timedelta64(timedelta_index[0])
         
+        self.timer = Timer()
         
         
     def run(self):
         
-                
+        self.timer.start()
+        
         # np timedelta is converted to float
         time = np.array([np.timedelta64(self.start_timedelta_index)]).astype('float64')
         data = np.array(self.time_series.iloc[0])
         return np.concatenate((time, data))
     
     # updates features including timedelta of state with latest features
-    def update_features(self, state, step):
+    def update_features(self, state):
         
-        pd_timedelta_now = np.timedelta64(step, 's') + self.start_timedelta_index
-        state[0] = pd_timedelta_now.astype('float64')
         
+        pd_timedelta_now = self.timer.stop() + self.start_timedelta_index
+        state[0] = np.timedelta64(pd_timedelta_now).astype('float64')
         print(self.time_series.iloc[self.time_series.index.get_loc(pd_timedelta_now, method='ffill'), :-1])
         state[1:-1] = np.array(self.time_series.iloc[self.time_series.index.get_loc(pd_timedelta_now, method='ffill'), : -1])
         print(state)
@@ -260,7 +264,7 @@ class Environment():
                 state[0] += self.slippage * 1000
                 pd_timedelta_now = pd.Timedelta(state[0], unit='microsecond')
                 
-                state[-1] = action
+                state[-1] += action
                 
                 state[1:-1] = np.array(self.time_series.iloc[self.time_series.index.get_loc(pd_timedelta_now, method='ffill'), :-1])
                 
@@ -287,26 +291,20 @@ class Environment():
         elif prev_signal == 1:
             
             exit_price = state_prime[self.feature_list.index("bid")+1]
-            exit_price = math.trunc(exit_price*10000)
             entry_price = state[self.feature_list.index("ask")+1]
-            entry_price = math.trunc(entry_price*10000)
             
             pips_delta = exit_price - entry_price
-            
             
         # if previous signal was in short position
         else:
             
             exit_price = state_prime[self.feature_list.index("ask")+1]
-            exit_price = math.trunc(exit_price*10000)
             entry_price = state[self.feature_list.index("bid")+1]
-            entry_price = math.trunc(entry_price*10000)
             
             pips_delta = entry_price - exit_price
             
                 
-        reward = pips_delta         
-        print("get_reward : ", reward)
+        reward = pips_delta             
         
         return reward
         
@@ -343,11 +341,11 @@ def deep_q_network(state_shape, action_size, learning_rate, hidden_neurons):
     return model
 
 def print_state(state, step, reward=None):
-    format_string = 'Step {0} - time: {1:.3f}, bid: {2:.3f}, ask: {3:.3f}, bid_vol:{4:.3f}, ask_vol:{5:.3f}, position:{6:.1f}'
+    format_string = 'Step {0} - time: {1:.3f}, bid: {2:.3f}, ask: {3:.3f}, bid_vol:{4:.3f}, ask_vol:{5:.3f}, Reward:{5}'
     print(format_string.format(step, *tuple(state), reward))
 
 
-#network
+
 state_shape = (6,)
 action_size = 3
 test_learning_rate = 0.3
@@ -370,29 +368,25 @@ test_agent = Agent(
 #training - one episode
 test_env = Environment(df['time'], df[["bid", "ask", "bid_vol", "ask_vol"]], 
                        datetime(2019, 12, 30, 14, 45, tzinfo=timezone.utc))
-#initialize state
 state = test_env.run()
+step = 0
+episode_reward = 0
+done = False
 
 
-def EpisodicTrain(state, episode_reward,  limit): 
-    step = 0
-    episode_reward = 0
-    done = False
-    
-    
-    while not done:
-        state = test_env.update_features(state, step)
-        action = test_agent.act(state, training=True)
-        print("action taken: " , action)
-        state_prime, done = test_env.take_action(state, action)
-        reward = test_env.get_reward(state, state_prime, done)
-        episode_reward += reward
-        test_agent.memory.add((state, action, reward, state_prime, done)) # New line here
-        step += 1
-        state = state_prime
-        print_state(state, step, reward)
-    
-    print(test_agent.learn())
-    print("Game over! Score =", episode_reward)
-    
-    
+
+
+while not done:
+    state = test_env.update_features(state)
+    action = test_agent.act(state, training=True)
+    print("action taken: " , action)
+    state_prime, done = test_env.take_action(state, action)
+    reward = test_env.get_reward(state, state_prime, done)
+    episode_reward += reward
+    test_agent.memory.add((state, action, reward, state_prime, done)) # New line here
+    step += 1
+    state = state_prime
+    print_state(state, step, reward)
+
+print(test_agent.learn())
+print("Game over! Score =", episode_reward)
