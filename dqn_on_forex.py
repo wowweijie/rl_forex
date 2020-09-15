@@ -94,7 +94,7 @@ class Agent():
         # If not acting randomly, take action with highest predicted value.
         print("Exploitation!")
         state_batch = np.expand_dims(state, axis=0)
-        print("state_batch : ", state_batch)
+        print("state_batch :", state_batch)
         predict_mask = np.ones((1, self.action_size,))
         action_qs = self.network.predict([state_batch, predict_mask])
         return np.argmax(action_qs[0])
@@ -170,7 +170,7 @@ class Memory():
             np.arange(buffer_size), size=self.batch_size, replace=False)
 
         # Columns have different data types, so numpy array would be awkward.
-        batch = np.array([self.buffer[i] for i in index]).T.tolist()
+        batch = np.array([self.buffer[i] for i in index], dtype=object).T.tolist()
         states_mb = tf.convert_to_tensor(np.array(batch[0], dtype=np.float32))
         actions_mb = np.array(batch[1], dtype=np.int8)
         rewards_mb = np.array(batch[2], dtype=np.float32)
@@ -219,10 +219,10 @@ class Environment():
         return np.concatenate((time, data))
     
     # updates features including timedelta of state with latest features
-    def update_features(self, state, step):
+    def update_features(self, state):
         
-        pd_timedelta_now = np.timedelta64(step, 's') + self.start_timedelta_index
-        state[0] = pd_timedelta_now.astype('float64')
+        pd_timedelta_now = np.timedelta64(1, 's') + np.timedelta64(int(state[0]), 'us')
+        state[0] = pd_timedelta_now.astype('int')
         
         print(self.time_series.iloc[self.time_series.index.get_loc(pd_timedelta_now, method='ffill'), :-1])
         state[1:-1] = np.array(self.time_series.iloc[self.time_series.index.get_loc(pd_timedelta_now, method='ffill'), : -1])
@@ -251,20 +251,22 @@ class Environment():
         # transform action(argmax) into directional action, 0 - HOLD, 1 - BUY, -1 - SELL
         action = self.action_space[action]
         
-        if action != 0:
-            
-            # if signal is neutral or opposite of the action, update the signal
-            if state[-1] == 0 or state[-1] != action:
+        # if state signal is different from action:
+        if state[-1] != action:
                             
                 # adjusting for slippage
-                state[0] += self.slippage * 1000
+                state[0] += self.slippage
                 pd_timedelta_now = pd.Timedelta(state[0], unit='microsecond')
                 
                 state[-1] = action
                 
                 state[1:-1] = np.array(self.time_series.iloc[self.time_series.index.get_loc(pd_timedelta_now, method='ffill'), :-1])
-                
         
+        else :
+                
+                # return state_prime as one second from state
+                state = self.update_features(state)
+            
         if pd.Timedelta(state[0], unit='microsecond') > self.time_series.iloc[-1].name:
             terminal_state = True
         
@@ -278,37 +280,61 @@ class Environment():
         reward = 0
         
         prev_signal = state[-1]
+        new_signal = state_prime[-1]
         
-        if prev_signal == 0:
-            
-            return reward
+        # if previous action was in hold then reward remains at zero
         
-        # if previous signal was in long position
-        elif prev_signal == 1:
+        # if previous action was long
+        if new_signal == 1:
             
-            exit_price = state_prime[self.feature_list.index("bid")+1]
-            exit_price = math.trunc(exit_price*10000)
-            entry_price = state[self.feature_list.index("ask")+1]
-            entry_price = math.trunc(entry_price*10000)
-            
-            pips_delta = exit_price - entry_price
-            
-            
-        # if previous signal was in short position
-        else:
             
             exit_price = state_prime[self.feature_list.index("ask")+1]
-            exit_price = math.trunc(exit_price*10000)
-            entry_price = state[self.feature_list.index("bid")+1]
-            entry_price = math.trunc(entry_price*10000)
+            exit_price = self.truncate(exit_price)
+            print("exit_price :", exit_price)
+            entry_price = state[self.feature_list.index("ask")+1]
+            entry_price = self.truncate(entry_price)
+            print("entry_price :", entry_price)
             
-            pips_delta = entry_price - exit_price
+            reward = exit_price - entry_price
+            
+            
+        # if previous action was in short 
+        elif new_signal == -1:
+            
+            exit_price = state_prime[self.feature_list.index("bid")+1]
+            exit_price = self.truncate(exit_price)
+            print("exit_price :", exit_price)
+            entry_price = state[self.feature_list.index("bid")+1]
+            entry_price = self.truncate(entry_price)
+            print("entry_price :", entry_price)
+            
+            reward = entry_price - exit_price
+            
+        # if entering into a new position
+        if new_signal != 0 and prev_signal != new_signal :
+            
+            bid_price = state_prime[self.feature_list.index("bid")+1]
+            bid_price = self.truncate(bid_price)
+            print("bid_price :", bid_price)
+            ask_price = state_prime[self.feature_list.index("ask")+1]
+            ask_price = self.truncate(ask_price)
+            print("ask_price :", ask_price)
+            
+            # bid-ask spread is subtracted from reward
+            reward += bid_price - ask_price
             
                 
-        reward = pips_delta         
-        print("get_reward : ", reward)
+        print("get_reward :", reward)
         
         return reward
+    
+    def truncate(self, number):
+        """truncates to pips
+        
+        """
+        
+        factor = 10.0 ** 5
+        return math.trunc(number * factor) / 10
         
         
         
@@ -370,29 +396,42 @@ test_agent = Agent(
 #training - one episode
 test_env = Environment(df['time'], df[["bid", "ask", "bid_vol", "ask_vol"]], 
                        datetime(2019, 12, 30, 14, 45, tzinfo=timezone.utc))
-#initialize state
-state = test_env.run()
 
 
-def EpisodicTrain(state, episode_reward,  limit): 
+
+def EpisodicTrain(episode_reward,  limit): 
     step = 0
     episode_reward = 0
     done = False
+    qwert = 0
+    
+    #initialize state
+    state = test_env.run()
     
     
     while not done:
-        state = test_env.update_features(state, step)
+        #state = test_env.update_features(state, step)
+        print("state :" , state)
         action = test_agent.act(state, training=True)
-        print("action taken: " , action)
+        print("action taken :" , action)
         state_prime, done = test_env.take_action(state, action)
+        print("state_prime :" , state_prime)
         reward = test_env.get_reward(state, state_prime, done)
+        if action != 1 :
+            qwert += 1
+            if qwert > limit :
+                print("limit reached")
+                break
         episode_reward += reward
         test_agent.memory.add((state, action, reward, state_prime, done)) # New line here
         step += 1
         state = state_prime
         print_state(state, step, reward)
     
-    print(test_agent.learn())
+    loss = test_agent.learn()
+    print("loss :", loss)
     print("Game over! Score =", episode_reward)
+    
+    return episode_reward
     
     
