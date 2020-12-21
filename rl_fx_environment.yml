@@ -1,0 +1,4 @@
+name: rl_fx
+channels:
+  - defaults
+prefix: /usr/local/envs/rl_fx
