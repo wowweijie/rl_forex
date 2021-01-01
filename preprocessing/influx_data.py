@@ -41,7 +41,7 @@ def load_from_influx_chicago(currency_pair : str, window_period : int):
         print(timestamp)
         chicago_pmi.iloc[index, 5] = timestamp
         
-    for dt_index, event_timestamp in chicago_pmi.loc[(chicago_pmi[5]<1577829597) & (chicago_pmi[5]>1514844008),5].iteritems():
+    for _, event_timestamp in chicago_pmi.loc[(chicago_pmi[5]<1577829597) & (chicago_pmi[5]>1514844008),5].iteritems():
         lower_limit_timestamp = event_timestamp - window_period
         upper_limit_timestamp = event_timestamp + window_period
 
@@ -87,13 +87,13 @@ def load_from_influx_query(currency_pair : str, start_date_time : str, end_date_
     """load currency pair tick data from influx through a timeframe query
 
     Args:
-    currency_pair (str) : for e.g. "EURUSD" 
-    start_date_time (int) : for e.g. "01-01-2020 13:45:00" in UTC time
-    end_date_time (int) : for e.g. "01-01-2020 13:45:00" in UTC time
+        currency_pair (str) : for e.g. "EURUSD" 
+        start_date_time (int) : for e.g. "01-01-2020 13:45:00" in UTC time
+        end_date_time (int) : for e.g. "01-01-2020 13:45:00" in UTC time
 
     
     Returns:
-    pandas dataframe 
+         pandas dataframe 
     """
     start_timestamp = datetime.strptime(start_date_time, "%d-%m-%Y %H:%M:%S").timestamp()
     end_timestamp = datetime.strptime(end_date_time, "%d-%m-%Y %H:%M:%S").timestamp()
