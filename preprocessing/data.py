@@ -1,4 +1,5 @@
 from __future__ import division,absolute_import,print_function
+import config
 import numpy as np
 import pandas as pd
 
@@ -7,14 +8,14 @@ def load_dataset(file_path: str):
     """
     load csv dataset from file path 
 
-    Args:`
+    Args:
         file_path (str) : in context/currency_pair/filename format for e.g. "chicago_pmi/EURUSD/filename" 
 
 
     Returns:
         pandas dataframe
     """
-    _data = pd.read_csv("datasets/{file_path}")
+    _data = pd.read_csv(f"preprocessing/datasets/{file_path}")
     return _data
 
 def data_split(df,start,end):

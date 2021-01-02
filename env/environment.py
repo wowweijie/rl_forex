@@ -1,4 +1,4 @@
-from finrl.config import config
+from config import config
 from stable_baselines.common.vec_env import DummyVecEnv
 
 
