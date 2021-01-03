@@ -143,4 +143,4 @@ dependencies:
   - zstd=1.4.5=h04227a9_0
   - pip:
     - strict-rfc3339==0.7
-prefix: C:\Users\Gideon\anaconda3\envs\rl_fx
+prefix: C:\Users\Lenovo\Anaconda3\envs\rl_forex
