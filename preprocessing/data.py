@@ -16,6 +16,8 @@ def load_dataset(file_path: str):
         pandas dataframe
     """
     _data = pd.read_csv(f"preprocessing/datasets/{file_path}")
+    _data['time'] = pd.to_datetime(_data['time'], yearfirst = True)
+    _data.set_index('time', inplace=True)
     return _data
 
 def data_split(df,start,end):
