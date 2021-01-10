@@ -146,4 +146,3 @@ dependencies:
   - pip:
     - strict-rfc3339==0.7
 prefix: C:\Users\Lenovo\Anaconda3\envs\rl_forex
->>>>>>> 627955c4565a98ea4b980326d9a4e0531f6dcb58
