@@ -1,4 +1,5 @@
 from __future__ import division,absolute_import,print_function
+from math import ceil
 import config
 import numpy as np
 import pandas as pd
@@ -16,18 +17,25 @@ def load_dataset(file_path: str):
         pandas dataframe
     """
     _data = pd.read_csv(f"preprocessing/datasets/{file_path}")
+    _data['time'] = pd.to_datetime(_data['time'], yearfirst = True)
+    _data.set_index('time', inplace=True)
     return _data
 
-def data_split(df,start,end):
+def train_test_split(df, train_fraction):
     """
-    split the dataset into training or testing using date
-    :param data: (df) pandas dataframe, start, end
-    :return: (df) pandas dataframe
+    splits time-indexed dataframe into train and test
+
+    Args:
+        train_fraction (float) : portion of data to be trainset"
+
+
+    Returns:
+        (train_df, test_df) a tuple of trainset and testset dataframe
     """
-    data = df[(df.date >= start) & (df.date < end)]
-    data=data.sort_values(['date','tic'],ignore_index=True)
-    data.index = data.date.factorize()[0]
-    return data
+    last_index = ceil(len(df) * 0.71) - 1 
+    train_df = df.loc[df.index[0] : df.index[last_index]]
+    test_df = df.loc[df.index[last_index + 1] : ]
+    return train_df, test_df
 
 
 def convert_to_datetime(time):
