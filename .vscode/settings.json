@@ -1,4 +1,5 @@
 {
     "jupyter.jupyterServerType": "remote",
+    "python.pythonPath": "C:\\Users\\Lenovo\\Anaconda3\\envs\\rl_fx\\python.exe",
     "python.condaPath": "D:\\User\\Anaconda3\\condabin\\conda"
 }
