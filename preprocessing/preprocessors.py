@@ -45,6 +45,19 @@ class FeatureEngineer:
         #self.__features = type_list
         #self.__data_columns = config.DEFAULT_DATA_COLUMNS + self.__features
 
+    def format_ohlc(self, df):
+        """
+        Format tick-level timeseries data
+
+        Returns:
+            pandas dataframe of timeseries in OHLC 1 second format
+        """
+        df = df[['ask', 'bid']].resample('1S').ohlc()
+        fillna_values = dict.fromkeys((('ask', col) for col in data_ohlc['ask'].columns.tolist()),data_ohlc['ask']['close'].ffill())
+        fillna_values.update(dict.fromkeys((('bid', col) for col in data_ohlc['bid'].columns.tolist()),data_ohlc['bid']['close'].ffill()))
+        df=df.fillna(fillna_values)
+        return df
+
 
     def preprocess_data(self):
         """main method to do the feature engineering
@@ -56,6 +69,8 @@ class FeatureEngineer:
         # add technical indicators
         # stockstats require all 5 columns
         if (self.use_technical_indicator==True):
+            # apply OHLC formatting
+            df = self.format_ohlc(df)
             # add technical indicators using stockstats
             df=self.add_technical_indicator(df)
             print("Successfully added technical indicators")

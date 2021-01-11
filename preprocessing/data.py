@@ -1,6 +1,6 @@
 from __future__ import division,absolute_import,print_function
 from math import ceil
-import config
+from config import config
 import numpy as np
 import pandas as pd
 
@@ -32,7 +32,7 @@ def train_test_split(df, train_fraction):
     Returns:
         (train_df, test_df) a tuple of trainset and testset dataframe
     """
-    last_index = ceil(len(df) * 0.71) - 1 
+    last_index = ceil(len(df) * train_fraction) - 1 
     train_df = df.loc[df.index[0] : df.index[last_index]]
     test_df = df.loc[df.index[last_index + 1] : ]
     return train_df, test_df
@@ -42,5 +42,7 @@ def convert_to_datetime(time):
     time_fmt = '%Y-%m-%dT%H:%M:%S'
     if isinstance(time, str):
         return datetime.datetime.strptime(time, time_fmt)
+
+
 
 
