@@ -52,9 +52,9 @@ class FeatureEngineer:
         Returns:
             pandas dataframe of timeseries in OHLC 1 second format
         """
-        df = df[['ask', 'bid']].resample('1S').ohlc()
-        fillna_values = dict.fromkeys((('ask', col) for col in data_ohlc['ask'].columns.tolist()),data_ohlc['ask']['close'].ffill())
-        fillna_values.update(dict.fromkeys((('bid', col) for col in data_ohlc['bid'].columns.tolist()),data_ohlc['bid']['close'].ffill()))
+        df = df.resample('1S').agg({'ask':'ohlc','bid':'ohlc','bid_vol':'sum','ask_vol':'sum'})
+        fillna_values = dict.fromkeys((('ask', col) for col in df['ask'].columns.tolist()),df['ask']['close'].ffill())
+        fillna_values.update(dict.fromkeys((('bid', col) for col in df['bid'].columns.tolist()),df['bid']['close'].ffill()))
         df=df.fillna(fillna_values)
         return df
 
