@@ -158,7 +158,7 @@ def export_csv_from_influx_chicago(currency_pair: str, window_period: int, dir_p
         upper_limit_timestamp = event_timestamp + window_period
 
         
-        query_statement = f'select "bid", "ask", "bid_vol", "ask_vol" from "dukascopy"."{currency_pair}" where time >= ' +\
+        query_statement = f'select "bid", "ask", "bid_vol", "ask_vol" from "dukascopy"."autogen"."{currency_pair}" where time >= ' +\
         str(int(lower_limit_timestamp)) + '000000000' +\
         ' and time <= ' + str(int(upper_limit_timestamp)) + '000000000 order by time asc' 
         
