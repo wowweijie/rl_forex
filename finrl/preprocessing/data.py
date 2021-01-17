@@ -7,7 +7,7 @@ import pandas as pd
 
 def load_dataset(file_path: str):
     """
-    load csv dataset from file path 
+    load raw csv tick dataset from file path 
 
     Args:
         file_path (str) : in context/currency_pair/filename format for e.g. "chicago_pmi/EURUSD/ohlc/filename" 
@@ -20,6 +20,11 @@ def load_dataset(file_path: str):
     _data['time'] = pd.to_datetime(_data['time'], yearfirst = True)
     _data.set_index('time', inplace=True)
     return _data
+
+def load_ohlc_dataset(file_path: str):
+    return pd.read_csv(f"{config.DATASET_DIR}/{file_path}",
+                 header = [0,1] ,index_col = 0,
+                  parse_dates = True)
 
 def export_dataset(df: pd.DataFrame, file_path: str):
     """
