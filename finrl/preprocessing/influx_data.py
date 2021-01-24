@@ -6,22 +6,23 @@ Created on Fri Aug  7 05:33:56 2020
 
 from influxdb import InfluxDBClient
 from datetime import datetime, timedelta
-from config import config
+from finrl.config import config
 import pandas as pd
-import numpy as np
 from matplotlib.dates import date2num, DateFormatter
 import matplotlib.pyplot as plt
 import pytz
 
 client = InfluxDBClient(host='localhost', port=8086)
 
-def load_from_influx_chicago(currency_pair : str, window_period : int): 
+
+def load_from_influx_chicago(currency_pair: str, window_period: int): 
     """load single currency pair tick data from Influx db
 
     Args:
         currency_pair (str) : for e.g. "EURUSD" 
-        window_period (int) : from a window_period seconds before an event trigger until a window_period seconds after. 
-                                window_frame is twice that of the window_period.
+        window_period (int) : from a window_period seconds before an event trigger until a 
+                            window_period seconds after. window_frame is twice that of the
+                            window_period.
 
     Returns:
         list of pandas dataframe
@@ -40,7 +41,7 @@ def load_from_influx_chicago(currency_pair : str, window_period : int):
         print(timestamp)
         chicago_pmi.iloc[index, 5] = timestamp
         
-    for _, event_timestamp in chicago_pmi.loc[(chicago_pmi[5]<1577829597) & (chicago_pmi[5]>1514844008),5].iteritems():
+    for _, event_timestamp in chicago_pmi.loc[(chicago_pmi[5]<1577836800) & (chicago_pmi[5]>1356998400),5].iteritems():
         lower_limit_timestamp = event_timestamp - window_period
         upper_limit_timestamp = event_timestamp + window_period
 
@@ -123,7 +124,21 @@ def load_from_influx_query(currency_pair : str, start_date_time : str, end_date_
 
     return df
 
-def export_csv_from_influx_chicago(currency_pair) : 
+def export_csv_from_influx_chicago(currency_pair: str, window_period: int, dir_path: str) :
+    """exports as csv a single currency pair tick data from Influx db between a certain
+        window period before and after Chicago PMI
+
+    Args:
+        currency_pair (str) : for e.g. "EURUSD" 
+        window_period (int) : from a window_period seconds before an event trigger until a 
+                            window_period seconds after. window_frame is twice that of the
+                            window_period.
+        dir_path (str) : specify a dir path from project root to export csv to. for e.g. 
+                            finrl/preprocessing/datasets/chicago_pmi/EURUSD/raw
+
+    Returns:
+        None
+    """ 
 
     chicago_pmi = pd.read_csv(f"{config.REF_DATA_SAVE_DIR}/Chicago_PMI_releases.csv", header=None)
     for index, row in chicago_pmi.iterrows():
@@ -138,12 +153,12 @@ def export_csv_from_influx_chicago(currency_pair) :
         print(timestamp)
         chicago_pmi.iloc[index, 5] = timestamp
         
-    for _, event_timestamp in chicago_pmi.loc[(chicago_pmi[5]<1577829597) & (chicago_pmi[5]>1514844008),5].iteritems():
-        lower_limit_timestamp = event_timestamp - 3600
-        upper_limit_timestamp = event_timestamp + 3600
+    for _, event_timestamp in chicago_pmi.loc[(chicago_pmi[5]<1577836800) & (chicago_pmi[5]>1356998400),5].iteritems():
+        lower_limit_timestamp = event_timestamp - window_period
+        upper_limit_timestamp = event_timestamp + window_period
 
         
-        query_statement = 'select "bid", "ask", "bid_vol", "ask_vol" from "dukascopy"."autogen"."EURUSD" where time >= ' +\
+        query_statement = f'select "bid", "ask", "bid_vol", "ask_vol" from "dukascopy"."autogen"."{currency_pair}" where time >= ' +\
         str(int(lower_limit_timestamp)) + '000000000' +\
         ' and time <= ' + str(int(upper_limit_timestamp)) + '000000000 order by time asc' 
         
@@ -153,7 +168,7 @@ def export_csv_from_influx_chicago(currency_pair) :
         bid_values = []
         ask_values = []
         
-        df = pd.DataFrame(columns = ["bid", "ask", "bid_vol", "ask_vol"])
+        df = pd.DataFrame(columns = ["time", "bid", "ask", "bid_vol", "ask_vol"])
         
         for point in results.get_points(): 
             
@@ -177,4 +192,6 @@ def export_csv_from_influx_chicago(currency_pair) :
             df = df.append(row, ignore_index = True)
         
         
-        df.to_csv(currency_pair + '_' + 'Chicago_Pmi_' + datetime.fromtimestamp(event_timestamp).strftime('%Y-%m-%d') + ".csv", index = False)    
+        df.to_csv(f'{config.DATASET_DIR}/{dir_path}/{currency_pair}_Chicago_Pmi_' + datetime.fromtimestamp(event_timestamp).strftime('%Y-%m-%d') + ".csv", index = False)    
+
+    return None
