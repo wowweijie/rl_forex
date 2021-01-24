@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-from stockstats import StockDataFrame as Sdf
 from finrl.config import config
+from talib import abstract
 
 
 class FeatureEngineer:
@@ -10,17 +10,13 @@ class FeatureEngineer:
     Attributes
     ----------
         df: DataFrame
-            data downloaded from Yahoo API
-            7 columns: A date, open, high, low, close, volume and tick symbol
-            for the specified stock ticker
+            data imported from ohlc folders of currency pairs
         use_technical_indicator : boolean
             we technical indicator or not
         tech_indicator_list : list
             a list of technical indicator names (modified from config.py)
-        use_turbulence : boolean
-            use turbulence index or not
-        user_defined_feature:boolean
-            user user defined features or not
+        tech_indicator_params_map = A nested dictionary to describe
+        
 
     Methods
     -------
@@ -32,14 +28,16 @@ class FeatureEngineer:
         df,
         use_technical_indicator=True,
         tech_indicator_list = config.TECHNICAL_INDICATORS_LIST,
-        use_turbulence=False,
-        user_defined_feature=False):
+        tech_indicator_params_map = {
+                'SMA': {'time_period' : 20}, #time_period in seoonds
+                'EMA': {'time_period' : 20}, #time_period in seoonds
+            } 
+        ):
 
         self.df = df
         self.use_technical_indicator = use_technical_indicator
         self.tech_indicator_list = tech_indicator_list
-        self.use_turbulence=use_turbulence
-        self.user_defined_feature=user_defined_feature
+        self.tech_indicator_parameter_map = tech_indicator_params_map
 
         #type_list = self._get_type_list(5)
         #self.__features = type_list
@@ -47,7 +45,7 @@ class FeatureEngineer:
 
     def format_ohlc(self, df):
         """
-        Format tick-level timeseries data
+        Format tick-level timeseries data into OHLC
 
         Returns:
             pandas dataframe of timeseries in OHLC 1 second format
@@ -60,59 +58,55 @@ class FeatureEngineer:
 
 
     def preprocess_data(self):
-        """main method to do the feature engineering
-        @:param config: source dataframe
-        @:return: a DataMatrices object
         """
-        df = self.df.copy()
+        Main method that does feature engineering. Firstly, it creates a new sub dataframe called "ovr" that
+        derives and average price from the OHLC of bid and ask, while summing the volume of bid and ask. If 
+
+        Returns:
+            pandas dataframe of OHLC dataframe with technical indicators and generated columns
+        """
+        self.df['ovr', 'open'] = self.df.apply(lambda row: (row['ask']['open'] + row['bid']['open'])/2, axis = 1)
+        self.df['ovr', 'high'] = self.df.apply(lambda row: (row['ask']['high'] + row['bid']['high'])/2, axis = 1)
+        self.df['ovr', 'low'] = self.df.apply(lambda row: (row['ask']['low'] + row['bid']['low'])/2, axis = 1)
+        self.df['ovr', 'close'] = self.df.apply(lambda row: (row['ask']['close'] + row['bid']['close'])/2, axis = 1)
+        self.df['ovr', 'volume'] = self.df.apply(lambda row: row['bid_vol']['bid_vol'] + row['ask_vol']['ask_vol'], axis = 1)
 
         # add technical indicators
         # stockstats require all 5 columns
         if (self.use_technical_indicator==True):
-            # apply OHLC formatting
-            df = self.format_ohlc(df)
+            
             # add technical indicators using stockstats
-            df=self.add_technical_indicator(df)
+            self.add_technical_indicator()
             print("Successfully added technical indicators")
 
-        # add turbulence index for multiple stock
-        if self.use_turbulence==True:
-            df = self.add_turbulence(df)
-            print("Successfully added turbulence index")
-
-        # add user defined feature
-        if self.user_defined_feature == True:
-            df = self.add_user_defined_feature(df)
-            print("Successfully added user defined features")
-
-       
-        # fill the missing values at the beginning and the end
-        df=df.fillna(method='bfill').fillna(method="ffill")
-        return df
+        return self.df
 
 
-    def add_technical_indicator(self, data):
+    def add_technical_indicator(self):
         """
-        calcualte technical indicators
-        use stockstats package to add technical inidactors
-        :param data: (df) pandas dataframe
-        :return: (df) pandas dataframe
+        Adds technical indicators from TA-lib onto new columns of the OHLCV dataframe in self.df
+
+        Returns:
+            pandas dataframe of OHLCV dataframe with technical indicators and generated columns
         """
-        df = data.copy()
-        stock = Sdf.retype(df.copy())
-        unique_ticker = stock.tic.unique()
 
         for indicator in self.tech_indicator_list:
-            indicator_df = pd.DataFrame()
-            for i in range(len(unique_ticker)):
-                try:
-                    temp_indicator = stock[stock.tic == unique_ticker[i]][indicator]
-                    temp_indicator= pd.DataFrame(temp_indicator)
-                    indicator_df = indicator_df.append(temp_indicator, ignore_index=True)
-                except Exception as e:
-                    print(e)
-            df[indicator] = indicator_df
-        return df
+            try :
+                params = self.tech_indicator_parameter_map.get(indicator)
+                
+            except KeyError as err:
+                print(f"tech_indicator {indicator} not added as it is not specified in parameter mapping, " + err) 
+                continue
+            
+            try:
+                ta_hook = abstract.Function(indicator)
+                self.df['ovr', indicator] =  ta_hook(self.df['ovr'], **params)
+            
+            except Exception as err:
+                print(f'{indicator} does not exist or has wrong parameters, ' + err)
+                continue
+            
+
 
     def add_user_defined_feature(self, data):
         """
