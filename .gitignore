@@ -1,3 +1,4 @@
 .vscode/settings.json
 sandbox.ipynb
 **/datasets/**/**/raw
+/*.csv
