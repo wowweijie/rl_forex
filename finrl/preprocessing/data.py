@@ -10,7 +10,7 @@ def load_dataset(file_path: str):
     load raw csv tick dataset from file path 
 
     Args:
-        file_path (str) : in context/currency_pair/filename format for e.g. "chicago_pmi/EURUSD/ohlc/filename" 
+        file_path (str) : from dataset folder in context/currency_pair/filename format for e.g. "chicago_pmi/EURUSD/ohlc/filename" 
 
 
     Returns:
@@ -31,7 +31,7 @@ def export_dataset(df: pd.DataFrame, file_path: str):
     exports csv dataset tp file path 
 
     Args:
-        file_path (str) : in context/currency_pair/filename format for e.g. "chicago_pmi/EURUSD/ohlc/filename" 
+        file_path (str) : from dataset folder in context/currency_pair/filename format for e.g. "chicago_pmi/EURUSD/ohlc/filename" 
         df (pd.Dataframe) : pandas dataframe
 
 
