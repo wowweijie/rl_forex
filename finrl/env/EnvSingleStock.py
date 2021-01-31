@@ -32,7 +32,7 @@ class SingleStockEnv(gym.Env):
             a list of technical indicator names
         turbulence_threshold: int
             a threshold to control risk aversion
-        day: int
+        curr_step: int
             an increment number to control date
 
     Methods
@@ -67,16 +67,16 @@ class SingleStockEnv(gym.Env):
                 state_space,
                 action_space,
                 tech_indicator_list,
-                turbulence_threshold,
-                day = 0):
+                curr_step = 0):
         #super(StockEnv, self).__init__()
         #money = 10 , scope = 1
-        self.day = day
         self.df = df
+        self.curr_step = curr_step
+        self.data = df.iloc[curr_step]
         self.stock_dim = stock_dim
         self.hmax = hmax
         self.initial_amount = initial_amount
-        self.transaction_cost_pct =transaction_cost_pct
+        self.transaction_cost_pct = transaction_cost_pct
         self.reward_scaling = reward_scaling
         self.state_space = state_space
         self.action_space = action_space
@@ -87,10 +87,7 @@ class SingleStockEnv(gym.Env):
         # Shape = 181: [Current Balance]+[prices 1-30]+[owned shares 1-30] 
         # +[macd 1-30]+ [rsi 1-30] + [cci 1-30] + [adx 1-30]
         self.observation_space = spaces.Box(low=0, high=np.inf, shape = (self.state_space,))
-        # load data from a pandas dataframe
-        self.data = self.df.loc[self.day,:]
         self.terminal = False     
-        self.turbulence_threshold = turbulence_threshold        
         # initalize state: inital amount + close price + shares + technical indicators + other features
         self.state = [self.initial_amount] + \
                       [self.data.close] + \
@@ -98,8 +95,8 @@ class SingleStockEnv(gym.Env):
                       sum([[self.data[tech]] for tech in self.tech_indicator_list ], [])+ \
                       [self.data.open] + \
                       [self.data.high] + \
-                      [self.data.low] +\
-                      [self.data.daily_return] 
+                      [self.data.low]
+        print("state :", self.state)
         # initialize reward
         self.reward = 0
         self.cost = 0
@@ -107,7 +104,7 @@ class SingleStockEnv(gym.Env):
         self.asset_memory = [self.initial_amount]
         self.rewards_memory = []
         self.actions_memory=[]
-        self.date_memory=[self.data.date]
+        self.date_memory=[self.data.index]
         self.close_price_memory = [self.data.close]
         self.trades = 0
         self._seed()
@@ -145,8 +142,8 @@ class SingleStockEnv(gym.Env):
         self.trades+=1
         
     def step(self, actions):
-        # print(self.day)
-        self.terminal = self.day >= len(self.df.index.unique())-1
+        # print(self.step)
+        self.terminal = self.curr_step >= len(self.df.index.unique())-1
         # print(actions)
 
         if self.terminal:
@@ -199,8 +196,8 @@ class SingleStockEnv(gym.Env):
                 # print('take buy action: {}'.format(actions[index]))
                 self._buy_stock(index, actions[index])
 
-            self.day += 1
-            self.data = self.df.loc[self.day,:]         
+            self.curr_step += 1
+            self.data = self.df.iloc[self.curr_step,:]         
             #load next state
             # print("stock_shares:{}".format(self.state[29:]))
             self.state =  [self.state[0]] + \
@@ -209,13 +206,12 @@ class SingleStockEnv(gym.Env):
                       sum([[self.data[tech]] for tech in self.tech_indicator_list ], [])+ \
                       [self.data.open] + \
                       [self.data.high] + \
-                      [self.data.low] +\
-                      [self.data.daily_return] 
+                      [self.data.low]
             
             end_total_asset = self.state[0]+ \
             sum(np.array(self.state[1:(self.stock_dim+1)])*np.array(self.state[(self.stock_dim+1):(self.stock_dim*2+1)]))
             self.asset_memory.append(end_total_asset)
-            self.date_memory.append(self.data.date)
+            self.date_memory.append(self.data.index)
             self.close_price_memory.append(self.data.close)
 
             #print("end_total_asset:{}".format(end_total_asset))
@@ -232,14 +228,14 @@ class SingleStockEnv(gym.Env):
 
     def reset(self):
         self.asset_memory = [self.initial_amount]
-        self.day = 0
-        self.data = self.df.loc[self.day,:]
+        self.curr_step = 0
+        self.data = self.df.iloc[self.curr_step,:]
         self.cost = 0
         self.trades = 0
         self.terminal = False 
         self.rewards_memory = []
         self.actions_memory=[]
-        self.date_memory=[self.data.date]
+        self.date_memory=[self.data.index]
         #initiate state
         self.state = [self.initial_amount] + \
                       [self.data.close] + \
@@ -247,8 +243,7 @@ class SingleStockEnv(gym.Env):
                       sum([[self.data[tech]] for tech in self.tech_indicator_list ], [])+ \
                       [self.data.open] + \
                       [self.data.high] + \
-                      [self.data.low] +\
-                      [self.data.daily_return] 
+                      [self.data.low]  
         return self.state
     
     def render(self, mode='human'):

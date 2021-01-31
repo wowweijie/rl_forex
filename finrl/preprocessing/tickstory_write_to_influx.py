@@ -44,11 +44,12 @@ def write_points_from_csv_to_influx(filename: str, symbol: str):
     print(str(len(lines)) + " lines")
     thefile = open(filename[:-4] + '.txt', 'x', newline='')
     
-    
+    ## comment out this portion to expedite write process ##
     for item in lines:
         thefile.write(item+'\n')
         
     thefile.close()
+    ####################################################
     
     # write to influx
     client.write_points(lines, database='dukascopy', time_precision='n', batch_size=10000, protocol='line')
