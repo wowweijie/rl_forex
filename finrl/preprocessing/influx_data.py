@@ -133,8 +133,8 @@ def export_csv_from_influx_chicago(currency_pair: str, window_period: int, dir_p
         window_period (int) : from a window_period seconds before an event trigger until a 
                             window_period seconds after. window_frame is twice that of the
                             window_period.
-        dir_path (str) : specify a dir path from project root to export csv to. for e.g. 
-                            finrl/preprocessing/datasets/chicago_pmi/EURUSD/raw
+        dir_path (str) : specify a dir path from dataset folder to export csv to. for e.g. 
+                            chicago_pmi/EURUSD/raw
 
     Returns:
         None
