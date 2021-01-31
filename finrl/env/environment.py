@@ -61,8 +61,7 @@ class EnvSetup:
                                                     reward_scaling = self.reward_scaling,
                                                     state_space = self.state_space,
                                                     action_space = self.action_space,
-                                                    tech_indicator_list = self.tech_indicator_list,
-                                                    turbulence_threshold = turbulence_threshold)])
+                                                    tech_indicator_list = self.tech_indicator_list)])
         return env_train
 
 
