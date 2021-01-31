@@ -1,4 +1,5 @@
 .vscode/settings.json
 sandbox.ipynb
 **/datasets/**/**/raw
+**/datasets/**/**/ohlc
 /*.csv

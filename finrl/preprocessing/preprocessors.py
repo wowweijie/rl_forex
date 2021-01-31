@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import copy
 from finrl.config import config
 from talib import abstract
 
@@ -37,7 +38,7 @@ class FeatureEngineer:
         self.df = df
         self.use_technical_indicator = use_technical_indicator
         self.tech_indicator_list = tech_indicator_list
-        self.tech_indicator_parameter_map = tech_indicator_params_map
+        self.tech_indicator_parameter_map = copy.deepcopy(tech_indicator_params_map)
 
         #type_list = self._get_type_list(5)
         #self.__features = type_list
@@ -89,21 +90,22 @@ class FeatureEngineer:
         Returns:
             pandas dataframe of OHLCV dataframe with technical indicators and generated columns
         """
-
+        
         for indicator in self.tech_indicator_list:
             try :
                 params = self.tech_indicator_parameter_map.get(indicator)
+                talib_name = params.pop('talib_name')
                 
             except KeyError as err:
-                print(f"tech_indicator {indicator} not added as it is not specified in parameter mapping, " + err) 
+                print(f"tech_indicator {indicator} not added as it is not specified in parameter mapping, ", err) 
                 continue
             
             try:
-                ta_hook = abstract.Function(indicator)
+                ta_hook = abstract.Function(talib_name)
                 self.df['ovr', indicator] =  ta_hook(self.df['ovr'], **params)
             
             except Exception as err:
-                print(f'{indicator} does not exist or has wrong parameters, ' + err)
+                print(f'{indicator} does not exist or has wrong parameters, ', err)
                 continue
             
 
