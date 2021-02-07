@@ -3,3 +3,6 @@ sandbox.ipynb
 **/datasets/**/**/raw
 **/datasets/**/**/ohlc
 /*.csv
+finrl/env/__pycache__/__init__.cpython-37.pyc,finrl/env/__pycache__/environment.cpython-37.pyc,finrl/env/__pycache__/EnvSingleStock.cpython-37.pyc,finrl/model/__pycache__/__init__.cpython-37.pyc,finrl/model/__pycache__/models.cpython-37.pyc
+**.pyc
+.vscode/launch.json
