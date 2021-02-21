@@ -1,8 +1,7 @@
 import numpy as np
 import pandas as pd
-import copy
+from stockstats import StockDataFrame as Sdf
 from finrl.config import config
-from talib import abstract
 
 
 class FeatureEngineer:
@@ -10,14 +9,14 @@ class FeatureEngineer:
 
     Attributes
     ----------
-        df: DataFrame
-            data imported from ohlc folders of currency pairs
         use_technical_indicator : boolean
             we technical indicator or not
         tech_indicator_list : list
             a list of technical indicator names (modified from config.py)
-        tech_indicator_params_map = A nested dictionary to describe
-        
+        use_turbulence : boolean
+            use turbulence index or not
+        user_defined_feature:boolean
+            user user defined features or not
 
     Methods
     -------
@@ -25,112 +24,82 @@ class FeatureEngineer:
         main method to do the feature engineering
 
     """
-    def __init__(self, 
-        df,
+
+    def __init__(
+        self,
         use_technical_indicator=True,
-        user_defined_feature = True,
-        tech_indicator_list = config.TECHNICAL_INDICATORS_LIST,
-        tech_indicator_params_map = {
-                'SMA': {'time_period' : 20}, #time_period in seoonds
-                'EMA': {'time_period' : 20}, #time_period in seoonds
-            } 
-        ):
-
-        self.df = df
+        tech_indicator_list=config.TECHNICAL_INDICATORS_LIST,
+        use_turbulence=False,
+        user_defined_feature=False,
+    ):
         self.use_technical_indicator = use_technical_indicator
-        self.user_defined_feature = user_defined_feature
         self.tech_indicator_list = tech_indicator_list
-        self.tech_indicator_parameter_map = copy.deepcopy(tech_indicator_params_map)
+        self.use_turbulence = use_turbulence
+        self.user_defined_feature = user_defined_feature
 
-        #type_list = self._get_type_list(5)
-        #self.__features = type_list
-        #self.__data_columns = config.DEFAULT_DATA_COLUMNS + self.__features
-
-    def format_ohlc(self, df):
+    def preprocess_data(self, df):
+        """main method to do the feature engineering
+        @:param config: source dataframe
+        @:return: a DataMatrices object
         """
-        Format tick-level timeseries data into OHLC
 
-        Returns:
-            pandas dataframe of timeseries in OHLC 1 second format
-        """
-        df = df.resample('1S').agg({'ask':'ohlc','bid':'ohlc','bid_vol':'sum','ask_vol':'sum'})
-        fillna_values = dict.fromkeys((('ask', col) for col in df['ask'].columns.tolist()),df['ask']['close'].ffill())
-        fillna_values.update(dict.fromkeys((('bid', col) for col in df['bid'].columns.tolist()),df['bid']['close'].ffill()))
-        df=df.fillna(fillna_values)
-        return df
-
-
-    def preprocess_data(self):
-        """
-        Main method that does feature engineering. Firstly, it creates a new sub dataframe called "ovr" that
-        derives and average price from the OHLC of bid and ask, while summing the volume of bid and ask. If 
-
-        Returns:
-            pandas dataframe of OHLC dataframe with technical indicators and generated columns
-        """
-        self.df['ovr', 'open'] = self.df.apply(lambda row: (row['ask']['open'] + row['bid']['open'])/2, axis = 1)
-        self.df['ovr', 'high'] = self.df.apply(lambda row: (row['ask']['high'] + row['bid']['high'])/2, axis = 1)
-        self.df['ovr', 'low'] = self.df.apply(lambda row: (row['ask']['low'] + row['bid']['low'])/2, axis = 1)
-        self.df['ovr', 'close'] = self.df.apply(lambda row: (row['ask']['close'] + row['bid']['close'])/2, axis = 1)
-        self.df['ovr', 'volume'] = self.df.apply(lambda row: row['bid_vol']['bid_vol'] + row['ask_vol']['ask_vol'], axis = 1)
-
-        # add technical indicators
-        # stockstats require all 5 columns
-        if (self.use_technical_indicator==True):
-            
+        if self.use_technical_indicator == True:
             # add technical indicators using stockstats
-            self.add_technical_indicator()
+            df = self.add_technical_indicator(df)
             print("Successfully added technical indicators")
+
+        # add turbulence index for multiple stock
+        if self.use_turbulence == True:
+            df = self.add_turbulence(df)
+            print("Successfully added turbulence index")
 
         # add user defined feature
         if self.user_defined_feature == True:
-            self.df = self.add_user_defined_feature(self.df)
+            df = self.add_user_defined_feature(df)
             print("Successfully added user defined features")
 
+        # fill the missing values at the beginning and the end
+        df = df.fillna(method="bfill").fillna(method="ffill")
+        return df
 
-        return self.df
-
-
-    def add_technical_indicator(self):
+    def add_technical_indicator(self, data):
         """
-        Adds technical indicators from TA-lib onto new columns of the OHLCV dataframe in self.df
-
-        Returns:
-            pandas dataframe of OHLCV dataframe with technical indicators and generated columns
+        calcualte technical indicators
+        use stockstats package to add technical inidactors
+        :param data: (df) pandas dataframe
+        :return: (df) pandas dataframe
         """
-        
+        df = data.copy()
+        stock = Sdf.retype(df.copy())
+        unique_ticker = stock.tic.unique()
+
         for indicator in self.tech_indicator_list:
-            try :
-                params = self.tech_indicator_parameter_map.get(indicator)
-                talib_name = params.pop('talib_name')
-                
-            except KeyError as err:
-                print(f"tech_indicator {indicator} not added as it is not specified in parameter mapping, ", err) 
-                continue
-            
-            try:
-                ta_hook = abstract.Function(talib_name)
-                self.df['ovr', indicator] =  ta_hook(self.df['ovr'], **params)
-            
-            except Exception as err:
-                print(f'{indicator} does not exist or has wrong parameters, ', err)
-                continue
-            
+            indicator_df = pd.DataFrame()
+            for i in range(len(unique_ticker)):
+                try:
+                    temp_indicator = stock[stock.tic == unique_ticker[i]][indicator]
+                    temp_indicator = pd.DataFrame(temp_indicator)
+                    indicator_df = indicator_df.append(
+                        temp_indicator, ignore_index=True
+                    )
+                except Exception as e:
+                    print(e)
+            df[indicator] = indicator_df
+        return df
 
-
-    def add_user_defined_feature(self, df):
+    def add_user_defined_feature(self, data):
         """
          add user defined features
         :param data: (df) pandas dataframe
         :return: (df) pandas dataframe
-        """          
-        df.loc[:,('ovr','daily_return')]=df['ovr','close'].pct_change(1)
-        #df['return_lag_1']=df.close.pct_change(2)
-        #df['return_lag_2']=df.close.pct_change(3)
-        #df['return_lag_3']=df.close.pct_change(4)
-        #df['return_lag_4']=df.close.pct_change(5)
+        """
+        df = data.copy()
+        df["daily_return"] = df.close.pct_change(1)
+        # df['return_lag_1']=df.close.pct_change(2)
+        # df['return_lag_2']=df.close.pct_change(3)
+        # df['return_lag_3']=df.close.pct_change(4)
+        # df['return_lag_4']=df.close.pct_change(5)
         return df
-
 
     def add_turbulence(self, data):
         """
@@ -139,61 +108,49 @@ class FeatureEngineer:
         :return: (df) pandas dataframe
         """
         df = data.copy()
-        turbulence_index = self.calcualte_turbulence(df)
-        df = df.merge(turbulence_index, on='date')
-        df = df.sort_values(['date','tic']).reset_index(drop=True)
+        turbulence_index = self.calculate_turbulence(df)
+        df = df.merge(turbulence_index, on="date")
+        df = df.sort_values(["date", "tic"]).reset_index(drop=True)
         return df
 
-
-    def calcualte_turbulence(self, data):
+    def calculate_turbulence(self, data):
         """calculate turbulence index based on dow 30"""
         # can add other market assets
         df = data.copy()
-        df_price_pivot=df.pivot(index='date', columns='tic', values='close')
+        df_price_pivot = df.pivot(index="date", columns="tic", values="close")
+        # use returns to calculate turbulence
+        df_price_pivot = df_price_pivot.pct_change()
+
         unique_date = df.date.unique()
         # start after a year
         start = 252
-        turbulence_index = [0]*start
-        #turbulence_index = [0]
-        count=0
-        for i in range(start,len(unique_date)):
+        turbulence_index = [0] * start
+        # turbulence_index = [0]
+        count = 0
+        for i in range(start, len(unique_date)):
             current_price = df_price_pivot[df_price_pivot.index == unique_date[i]]
-            hist_price = df_price_pivot[[n in unique_date[0:i] for n in df_price_pivot.index ]]
-            cov_temp = hist_price.cov()
-            current_temp=(current_price - np.mean(hist_price,axis=0))
-            temp = current_temp.values.dot(np.linalg.inv(cov_temp)).dot(current_temp.values.T)
-            if temp>0:
-                count+=1
-                if count>2:
+            # use one year rolling window to calcualte covariance
+            hist_price = df_price_pivot[(df_price_pivot.index < unique_date[i]) & (df_price_pivot.index >= unique_date[i-252])]
+            # Drop tickers which has number missing values more than the "oldest" ticker
+            filtered_hist_price = hist_price.iloc[hist_price.isna().sum().min():].dropna(axis=1)
+
+            cov_temp = filtered_hist_price.cov()
+            current_temp = current_price[[x for x in filtered_hist_price]] - np.mean(filtered_hist_price, axis=0)
+            temp = current_temp.values.dot(np.linalg.pinv(cov_temp)).dot(
+                current_temp.values.T
+            )
+            if temp > 0:
+                count += 1
+                if count > 2:
                     turbulence_temp = temp[0][0]
                 else:
-                    #avoid large outlier because of the calculation just begins
-                    turbulence_temp=0
+                    # avoid large outlier because of the calculation just begins
+                    turbulence_temp = 0
             else:
-                turbulence_temp=0
+                turbulence_temp = 0
             turbulence_index.append(turbulence_temp)
-        
-        
-        turbulence_index = pd.DataFrame({'date':df_price_pivot.index,
-                                         'turbulence':turbulence_index})
-        return turbulence_index
 
-    def _get_type_list(self, feature_number):
-        """
-        :param feature_number: an int indicates the number of features
-        :return: a list of features n
-        """
-        if feature_number == 1:
-            type_list = ["close"]
-        elif feature_number == 2:
-            type_list = ["close", "volume"]
-            #raise NotImplementedError("the feature volume is not supported currently")
-        elif feature_number == 3:
-            type_list = ["close", "high", "low"]
-        elif feature_number == 4:
-            type_list = ["close", "high", "low", "open"]
-        elif feature_number == 5:
-            type_list = ["close", "high", "low", "open","volume"]  
-        else:
-            raise ValueError("feature number could not be %s" % feature_number)
-        return type_list
+        turbulence_index = pd.DataFrame(
+            {"date": df_price_pivot.index, "turbulence": turbulence_index}
+        )
+        return turbulence_index
