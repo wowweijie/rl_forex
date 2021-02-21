@@ -87,6 +87,8 @@ class SingleStockEnv(gym.Env):
         # Shape = 181: [Current Balance]+[prices 1-30]+[owned shares 1-30] 
         # +[macd 1-30]+ [rsi 1-30] + [cci 1-30] + [adx 1-30]
         self.observation_space = spaces.Box(low=0, high=np.inf, shape = (self.state_space,))
+        # load data from a pandas dataframe
+        self.data = self.df.iloc[self.day,:]
         self.terminal = False     
         # initalize state: inital amount + close price + shares + technical indicators + other features
         self.state = [self.initial_amount] + \
@@ -104,7 +106,7 @@ class SingleStockEnv(gym.Env):
         self.asset_memory = [self.initial_amount]
         self.rewards_memory = []
         self.actions_memory=[]
-        self.date_memory=[self.data.index]
+        self.date_memory=[self.data.name]
         self.close_price_memory = [self.data.close]
         self.trades = 0
         self._seed()
@@ -211,7 +213,7 @@ class SingleStockEnv(gym.Env):
             end_total_asset = self.state[0]+ \
             sum(np.array(self.state[1:(self.stock_dim+1)])*np.array(self.state[(self.stock_dim+1):(self.stock_dim*2+1)]))
             self.asset_memory.append(end_total_asset)
-            self.date_memory.append(self.data.index)
+            self.date_memory.append(self.data.name)
             self.close_price_memory.append(self.data.close)
 
             #print("end_total_asset:{}".format(end_total_asset))
@@ -235,7 +237,7 @@ class SingleStockEnv(gym.Env):
         self.terminal = False 
         self.rewards_memory = []
         self.actions_memory=[]
-        self.date_memory=[self.data.index]
+        self.date_memory=[self.data.name]
         #initiate state
         self.state = [self.initial_amount] + \
                       [self.data.close] + \
