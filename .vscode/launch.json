@@ -10,7 +10,9 @@
             "type": "python",
             "request": "launch",
             "program": "${file}",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "openOnSessionStart",
+            "python" : "D:\\User\\Anaconda3\\envs\\rl_fx\\python.exe"
         }
     ]
 }
