@@ -88,7 +88,7 @@ class SingleStockEnv(gym.Env):
         # +[macd 1-30]+ [rsi 1-30] + [cci 1-30] + [adx 1-30]
         self.observation_space = spaces.Box(low=0, high=np.inf, shape = (self.state_space,))
         # load data from a pandas dataframe
-        self.data = self.df.iloc[self.day,:]
+        self.data = self.df.iloc[self.curr_step,:]
         self.terminal = False     
         # initalize state: inital amount + close price + shares + technical indicators + other features
         self.state = [self.initial_amount] + \
