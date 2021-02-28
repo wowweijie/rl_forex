@@ -1,6 +1,7 @@
 from __future__ import division,absolute_import,print_function
 from math import ceil
 from finrl.config import config
+import datetime
 import numpy as np
 import pandas as pd
 
@@ -70,6 +71,18 @@ def train_test_split(df, train_fraction):
     train_df = df.loc[df.index[0] : df.index[last_index]]
     test_df = df.loc[df.index[last_index + 1] : ]
     return train_df, test_df
+
+def data_split(df, start, end):
+    """
+    split the dataset into training or testing using date
+    :param data: (df) pandas dataframe, start, end
+    :return: (df) pandas dataframe
+    """
+    data = df[(df.date >= start) & (df.date < end)]
+    data = data.sort_values(["date", "tic"], ignore_index=True)
+    data.index = data.date.factorize()[0]
+    return data
+
 
 
 def convert_to_datetime(time):

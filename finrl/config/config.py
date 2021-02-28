@@ -21,6 +21,11 @@ TRAINED_MODEL_DIR = f"trained_models"
 # TURBULENCE_DATA = "data/dow30_turbulence_index.csv"
 # TESTING_DATA_FILE = "test.csv"
 
+# own configs ###############################
+REF_DATA_SAVE_DIR = "finrl/preprocessing/datasets/reference"
+DATASET_DIR = f"finrl/preprocessing/datasets"
+#############################################
+
 # now = datetime.datetime.now()
 # TRAINED_MODEL_DIR = f"trained_models/{now}"
 DATA_SAVE_DIR = f"datasets"
