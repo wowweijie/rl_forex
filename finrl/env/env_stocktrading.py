@@ -48,7 +48,7 @@ class StockTradingEnv(gym.Env):
         self.tech_indicator_list = tech_indicator_list
         self.action_space = spaces.Box(low = -1, high = 1,shape = (self.action_space,)) 
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape = (self.state_space,))
-        self.data = self.df.loc[self.day,:]
+        self.data = self.df.iloc[self.day,:]
         self.terminal = False     
         self.make_plots = make_plots
         self.print_verbosity = print_verbosity
@@ -244,7 +244,7 @@ class StockTradingEnv(gym.Env):
             self.actions_memory.append(actions)
 
             self.day += 1
-            self.data = self.df.loc[self.day,:]    
+            self.data = self.df.iloc[self.day,:]    
             if self.turbulence_threshold is not None:     
                 self.turbulence = self.data['turbulence'].values[0]
             self.state =  self._update_state()
@@ -271,7 +271,7 @@ class StockTradingEnv(gym.Env):
             self.asset_memory = [previous_total_asset]
 
         self.day = 0
-        self.data = self.df.loc[self.day,:]
+        self.data = self.df.iloc[self.day,:]
         self.turbulence = 0
         self.cost = 0
         self.trades = 0
@@ -303,6 +303,7 @@ class StockTradingEnv(gym.Env):
                         [self.data.close] + \
                         [0]*self.stock_dim  + \
                         sum([[self.data[tech]] for tech in self.tech_indicator_list ], [])
+                print("state : {self.state}")
         else:
             #Using Previous State
             if len(self.df.tic.unique())>1:

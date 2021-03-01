@@ -73,6 +73,9 @@ class FeatureEngineer:
         self.df['ovr', 'low'] = self.df.apply(lambda row: (row['ask']['low'] + row['bid']['low'])/2, axis = 1)
         self.df['ovr', 'close'] = self.df.apply(lambda row: (row['ask']['close'] + row['bid']['close'])/2, axis = 1)
         self.df['ovr', 'volume'] = self.df.apply(lambda row: row['bid_vol']['bid_vol'] + row['ask_vol']['ask_vol'], axis = 1)
+        
+        # add tic 
+        self.df.loc[:, ('ovr', 'tic')] = 'FX'
 
         # add technical indicators
         # stockstats require all 5 columns
@@ -124,7 +127,8 @@ class FeatureEngineer:
         :param data: (df) pandas dataframe
         :return: (df) pandas dataframe
         """          
-        df.loc[:,('ovr','daily_return')]=df['ovr','close'].pct_change(1)
+        
+        df.loc[:, ('ovr','daily_return')]=df['ovr','close'].pct_change(1)
         #df['return_lag_1']=df.close.pct_change(2)
         #df['return_lag_2']=df.close.pct_change(3)
         #df['return_lag_3']=df.close.pct_change(4)

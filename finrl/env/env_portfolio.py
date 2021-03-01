@@ -101,6 +101,9 @@ class StockPortfolioEnv(gym.Env):
         # initalize state: inital portfolio return + individual stock return + individual weights
         self.portfolio_value = self.initial_amount
 
+        #initialize reward
+        self.reward = 0
+
         # memorize portfolio value each step
         self.asset_memory = [self.initial_amount]
         # memorize portfolio return each step
