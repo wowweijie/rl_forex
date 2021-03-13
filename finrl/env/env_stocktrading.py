@@ -8,6 +8,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pickle
 from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common import logger
 
 
@@ -376,6 +377,6 @@ class StockTradingEnv(gym.Env):
 
 
     def get_sb_env(self):
-        e = DummyVecEnv([lambda: self])
+        e = DummyVecEnv([lambda: Monitor(self)])
         obs = e.reset()
         return e, obs
