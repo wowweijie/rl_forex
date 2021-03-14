@@ -28,6 +28,7 @@ class FeatureEngineer:
     def __init__(self, 
         df,
         use_technical_indicator=True,
+        user_defined_feature = True,
         tech_indicator_list = config.TECHNICAL_INDICATORS_LIST,
         tech_indicator_params_map = {
                 'SMA': {'time_period' : 20}, #time_period in seoonds
@@ -37,6 +38,7 @@ class FeatureEngineer:
 
         self.df = df
         self.use_technical_indicator = use_technical_indicator
+        self.user_defined_feature = user_defined_feature
         self.tech_indicator_list = tech_indicator_list
         self.tech_indicator_parameter_map = copy.deepcopy(tech_indicator_params_map)
 
@@ -71,6 +73,9 @@ class FeatureEngineer:
         self.df['ovr', 'low'] = self.df.apply(lambda row: (row['ask']['low'] + row['bid']['low'])/2, axis = 1)
         self.df['ovr', 'close'] = self.df.apply(lambda row: (row['ask']['close'] + row['bid']['close'])/2, axis = 1)
         self.df['ovr', 'volume'] = self.df.apply(lambda row: row['bid_vol']['bid_vol'] + row['ask_vol']['ask_vol'], axis = 1)
+        
+        # add tic 
+        self.df.loc[:, ('ovr', 'tic')] = 'FX'
 
         # add technical indicators
         # stockstats require all 5 columns
@@ -79,6 +84,12 @@ class FeatureEngineer:
             # add technical indicators using stockstats
             self.add_technical_indicator()
             print("Successfully added technical indicators")
+
+        # add user defined feature
+        if self.user_defined_feature == True:
+            self.df = self.add_user_defined_feature(self.df)
+            print("Successfully added user defined features")
+
 
         return self.df
 
@@ -110,14 +121,14 @@ class FeatureEngineer:
             
 
 
-    def add_user_defined_feature(self, data):
+    def add_user_defined_feature(self, df):
         """
          add user defined features
         :param data: (df) pandas dataframe
         :return: (df) pandas dataframe
         """          
-        df = data.copy()
-        df['daily_return']=df.close.pct_change(1)
+        
+        df.loc[:, ('ovr','daily_return')]=df['ovr','close'].pct_change(1)
         #df['return_lag_1']=df.close.pct_change(2)
         #df['return_lag_2']=df.close.pct_change(3)
         #df['return_lag_3']=df.close.pct_change(4)

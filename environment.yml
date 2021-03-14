@@ -16,8 +16,11 @@ dependencies:
   - strict-rfc3339=0.7
   - ta-lib=0.4.19
   - scikit-learn=0.23.2
+  - bayesian-optimization=1.1.0=py_0
+  - scikit-optimize=0.8.1
   - pip:
     - stable-baselines3==0.10.0
     - torch==1.7.1
     - typing-extensions==3.7.4.3
+    - pyfolio==0.9.2
 prefix: D:\User\Anaconda3\envs\rl_fx
