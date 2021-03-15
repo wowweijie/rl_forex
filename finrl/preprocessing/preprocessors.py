@@ -113,7 +113,18 @@ class FeatureEngineer:
             
             try:
                 ta_hook = abstract.Function(talib_name)
-                self.df['ovr', indicator] =  ta_hook(self.df['ovr'], **params)
+                new_features = ta_hook(self.df['ovr'], **params)
+
+                if type(new_features) is pd.Series: 
+                    self.df['ovr', indicator] =  new_features
+                
+                elif type(new_features) is pd.DataFrame:
+                    new_features.columns = list(map(lambda colname : indicator + "_" + colname,
+                                                     list(new_features.columns)))
+                    print("concat: ", pd.concat([self.df['ovr'], new_features], axis = 1))                                 
+                    self.df['ovr'] = pd.concat([self.df['ovr'], new_features], axis = 1)
+                    print(self.df['ovr'])
+
             
             except Exception as err:
                 print(f'{indicator} does not exist or has wrong parameters, ', err)
