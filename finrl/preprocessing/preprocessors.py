@@ -119,11 +119,9 @@ class FeatureEngineer:
                     self.df['ovr', indicator] =  new_features
                 
                 elif type(new_features) is pd.DataFrame:
-                    new_features.columns = list(map(lambda colname : indicator + "_" + colname,
-                                                     list(new_features.columns)))
-                    print("concat: ", pd.concat([self.df['ovr'], new_features], axis = 1))                                 
-                    self.df['ovr'] = pd.concat([self.df['ovr'], new_features], axis = 1)
-                    print(self.df['ovr'])
+                    for colname in list(new_features.columns):
+                        modified_colname = indicator + "_" + colname
+                        self.df.loc[:,('ovr', modified_colname)] =  new_features[colname]
 
             
             except Exception as err:
