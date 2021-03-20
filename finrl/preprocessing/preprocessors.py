@@ -68,6 +68,8 @@ class FeatureEngineer:
         Returns:
             pandas dataframe of OHLC dataframe with technical indicators and generated columns
         """
+        self.df = self.df.dropna()
+
         self.df['ovr', 'open'] = self.df.apply(lambda row: (row['ask']['open'] + row['bid']['open'])/2, axis = 1)
         self.df['ovr', 'high'] = self.df.apply(lambda row: (row['ask']['high'] + row['bid']['high'])/2, axis = 1)
         self.df['ovr', 'low'] = self.df.apply(lambda row: (row['ask']['low'] + row['bid']['low'])/2, axis = 1)
