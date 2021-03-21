@@ -7,6 +7,7 @@ Created on Fri Aug  7 05:33:56 2020
 from influxdb import InfluxDBClient
 from datetime import datetime, timedelta
 from finrl.config import config
+from finrl.preprocessing.data import export_dataset
 import pandas as pd
 from matplotlib.dates import date2num, DateFormatter
 import matplotlib.pyplot as plt
@@ -95,12 +96,17 @@ def load_from_influx_query(currency_pair : str, start_date_time : str, end_date_
     Returns:
          pandas dataframe 
     """
-    start_timestamp = datetime.strptime(start_date_time, "%d-%m-%Y %H:%M:%S").timestamp()
-    end_timestamp = datetime.strptime(end_date_time, "%d-%m-%Y %H:%M:%S").timestamp()
+    start_datetime = pytz.utc.localize(datetime.strptime(start_date_time, "%d-%m-%Y %H:%M:%S"))
+    end_datetime = pytz.utc.localize(datetime.strptime(end_date_time, "%d-%m-%Y %H:%M:%S"))
 
-    query_statement = 'select "bid", "ask", "bid_vol", "ask_vol" from "dukascopy"."autogen"."EURUSD" where time >= ' +\
+    start_timestamp = start_datetime.timestamp()
+    end_timestamp = end_datetime.timestamp()
+
+    query_statement = 'select "bid", "ask", "bid_vol", "ask_vol" from "dukascopy".."EURUSD" where time >= ' +\
         str(int(start_timestamp)) + '000000000' +\
         ' and time <= ' + str(int(end_timestamp)) + '000000000 order by time asc'
+
+    print(query_statement)
 
     results = client.query(query_statement)
 
@@ -123,6 +129,38 @@ def load_from_influx_query(currency_pair : str, start_date_time : str, end_date_
             df = df.append(row, ignore_index = True)
 
     return df
+
+def export_csv_aggregated_from_influx(currency_pair : str, start_date_time : str, end_date_time : str, ohlc_interval: str, file_path : str):
+    """export a continuous window of ohlc data aggregated in a specified time interval to specified file path
+
+    Args:
+        currency_pair (str) : for e.g. "EURUSD" 
+        start_date_time (int) : for e.g. "01-01-2020 13:45:00" in UTC time
+        end_date_time (int) : for e.g. "01-01-2020 13:45:00" in UTC time
+        file_path (str) : from finrl/preprocessing/datasets, e.g. "months_2019" 
+
+    Returns:
+        No
+    """
+
+    df = load_from_influx_query(currency_pair, start_date_time, end_date_time)
+
+    # setting index to datetime
+    df['time'] = pd.to_datetime(df['time'], yearfirst = True)
+    df.set_index('time', inplace=True)
+
+    # setting count
+    df['count'] = 0
+
+    print(df)
+    df = df.resample(ohlc_interval).agg({'ask':'ohlc','bid':'ohlc','bid_vol':'sum','ask_vol':'sum', 'count' : 'size'})
+    print(df.head())
+    # fillna_values = dict.fromkeys((('ask', col) for col in df['ask'].columns.tolist()),df['ask']['close'].ffill())
+    # fillna_values.update(dict.fromkeys((('bid', col) for col in df['bid'].columns.tolist()),df['bid']['close'].ffill()))
+    # df=df.fillna(fillna_values)
+    # export_dataset(df, file_path)
+
+    
 
 def export_csv_from_influx_chicago(currency_pair: str, window_period: int, dir_path: str) :
     """exports as csv a single currency pair tick data from Influx db between a certain
