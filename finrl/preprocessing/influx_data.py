@@ -150,15 +150,14 @@ def export_csv_aggregated_from_influx(currency_pair : str, start_date_time : str
     df.set_index('time', inplace=True)
 
     # setting count
-    df['count'] = 0
+    df['tick_count'] = 0
 
+    df = df.resample(ohlc_interval).agg({'ask':'ohlc','bid':'ohlc','bid_vol':'sum','ask_vol':'sum', 'tick_count' : 'count'})
+    fillna_values = dict.fromkeys((('ask', col) for col in df['ask'].columns.tolist()),df['ask']['close'].ffill())
+    fillna_values.update(dict.fromkeys((('bid', col) for col in df['bid'].columns.tolist()),df['bid']['close'].ffill()))
+    df.fillna(fillna_values, inplace = True)
     print(df)
-    df = df.resample(ohlc_interval).agg({'ask':'ohlc','bid':'ohlc','bid_vol':'sum','ask_vol':'sum', 'count' : 'size'})
-    print(df.head())
-    # fillna_values = dict.fromkeys((('ask', col) for col in df['ask'].columns.tolist()),df['ask']['close'].ffill())
-    # fillna_values.update(dict.fromkeys((('bid', col) for col in df['bid'].columns.tolist()),df['bid']['close'].ffill()))
-    # df=df.fillna(fillna_values)
-    # export_dataset(df, file_path)
+    export_dataset(df, file_path)
 
     
 
