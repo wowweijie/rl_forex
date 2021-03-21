@@ -15,9 +15,10 @@ dependencies:
   - gym=0.18.0
   - strict-rfc3339=0.7
   - ta-lib=0.4.19
-  - scikit-learn
+  - scikit-learn=0.22
   - bayesian-optimization=1.1.0=py_0
   - scikit-optimize
+  - pip=21.0.1
   - pip:
     - stable-baselines3==0.10.0
     - torch==1.7.1
