@@ -92,6 +92,15 @@ class FeatureEngineer:
             self.df = self.add_user_defined_feature(self.df)
             print("Successfully added user defined features")
 
+        # change columns into 1D
+
+        self.df.columns = self.df.columns.map(lambda levelindex : 
+                            (levelindex[0], "_".join(levelindex) if levelindex[0] == "ask" or levelindex[0] == "bid" else levelindex[1])
+                            ).droplevel(0)
+
+
+        #drop all na values
+        self.df.dropna(inplace=True)
 
         return self.df
 
