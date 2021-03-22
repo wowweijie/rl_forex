@@ -4,7 +4,7 @@ Created on Fri Aug  7 05:33:56 2020
 @author: Wong Wei Jie
 """
 
-from influxdb import InfluxDBClient
+from influxdb import DataFrameClient, InfluxDBClient
 from datetime import datetime, timedelta
 from finrl.config import config
 from finrl.preprocessing.data import export_dataset
@@ -13,7 +13,7 @@ from matplotlib.dates import date2num, DateFormatter
 import matplotlib.pyplot as plt
 import pytz
 
-client = InfluxDBClient(host='localhost', port=8086)
+client = DataFrameClient(host='localhost', port=8086)
 
 
 def load_from_influx_chicago(currency_pair: str, window_period: int): 
@@ -28,6 +28,8 @@ def load_from_influx_chicago(currency_pair: str, window_period: int):
     Returns:
         list of pandas dataframe
     """
+
+    client = InfluxDBClient(host='localhost', port=8086)
 
     chicago_pmi = pd.read_csv(f"{config.REF_DATA_SAVE_DIR}/Chicago_PMI_releases.csv", header=None)
     for index, row in chicago_pmi.iterrows():
@@ -110,23 +112,7 @@ def load_from_influx_query(currency_pair : str, start_date_time : str, end_date_
 
     results = client.query(query_statement)
 
-    df = pd.DataFrame(columns = ["time", "bid", "ask", "bid_vol", "ask_vol"])
-
-    for point in results.get_points(): 
-            
-            try : 
-                date_time_value = datetime.strptime(point["time"], '%Y-%m-%dT%H:%M:%S.%fZ')
-            except : 
-                date_time_value = datetime.strptime(point["time"], '%Y-%m-%dT%H:%M:%SZ')
-    
-            row = {"time" : date_time_value,
-                "bid" : point["bid"], 
-                "ask" : point["ask"],
-                "bid_vol" : point["bid_vol"],
-                "ask_vol" : point["ask_vol"],
-                }
-            
-            df = df.append(row, ignore_index = True)
+    df = pd.DataFrame.from_dict(results[currency_pair], orient='columns')    
 
     return df
 
@@ -137,17 +123,17 @@ def export_csv_aggregated_from_influx(currency_pair : str, start_date_time : str
         currency_pair (str) : for e.g. "EURUSD" 
         start_date_time (int) : for e.g. "01-01-2020 13:45:00" in UTC time
         end_date_time (int) : for e.g. "01-01-2020 13:45:00" in UTC time
-        file_path (str) : from finrl/preprocessing/datasets, e.g. "months_2019" 
+        file_path (str) : from finrl/preprocessing/datasets, e.g. "15min/EURUSD/01_19.csv" 
 
     Returns:
-        No
+        None. CSV file saved in file path target location
     """
 
     df = load_from_influx_query(currency_pair, start_date_time, end_date_time)
 
     # setting index to datetime
-    df['time'] = pd.to_datetime(df['time'], yearfirst = True)
-    df.set_index('time', inplace=True)
+    # df['time'] = pd.to_datetime(df['time'], yearfirst = True)
+    # df.set_index('time', inplace=True)
 
     # setting count
     df['tick_count'] = 0
@@ -158,6 +144,8 @@ def export_csv_aggregated_from_influx(currency_pair : str, start_date_time : str
     df.fillna(fillna_values, inplace = True)
     print(df)
     export_dataset(df, file_path)
+
+    return df
 
     
 
@@ -176,6 +164,8 @@ def export_csv_from_influx_chicago(currency_pair: str, window_period: int, dir_p
     Returns:
         None
     """ 
+    client = InfluxDBClient(host='localhost', port=8086)
+
 
     chicago_pmi = pd.read_csv(f"{config.REF_DATA_SAVE_DIR}/Chicago_PMI_releases.csv", header=None)
     for index, row in chicago_pmi.iterrows():

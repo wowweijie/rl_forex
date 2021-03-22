@@ -43,9 +43,12 @@ def export_dataset(df: pd.DataFrame, file_path: str):
     print(f"dataset exported to {config.DATASET_DIR}/{file_path}")
 
 
-def format_ohlc(df: pd.DataFrame):
+def format_ohlc(df: pd.DataFrame, interval : str):
     """
     Format tick-level timeseries data
+
+    Args:
+        interval (str) : '1S' for 1 second ohlc, '15min' for 15 minute ohlc
 
     Returns:
         pandas dataframe of timeseries in OHLC 1 second format
