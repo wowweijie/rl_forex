@@ -7,6 +7,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pickle
+import pyqtgraph as pg
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common import logger
@@ -216,6 +217,7 @@ class StockTradingEnv(gym.Env):
             logger.record("environment/total_reward_pct", (tot_reward / (end_total_asset - tot_reward)) * 100)
             logger.record("environment/total_cost", self.cost)
             logger.record("environment/total_trades", self.trades)
+            logger.record("train/episode_reward", self.reward)
 
             return self.state, self.reward, self.terminal, {}
 
