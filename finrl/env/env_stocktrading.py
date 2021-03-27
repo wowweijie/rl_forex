@@ -200,8 +200,6 @@ class StockTradingEnv(gym.Env):
                 if df_total_value['daily_return'].std() != 0:
                     print(f"Sharpe: {sharpe:0.3f}")
                 print("=================================")
-                pltext.plot(tot_reward)
-                pltext.show()
 
             if (self.model_name!='') and (self.mode!=''):
                 df_actions = self.save_action_memory()
