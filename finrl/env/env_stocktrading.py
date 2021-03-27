@@ -7,11 +7,10 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pickle
-import pyqtgraph as pg
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common import logger
-
+import plotext as pltext
 
 class StockTradingEnv(gym.Env):
     """A stock trading environment for OpenAI gym"""
@@ -201,6 +200,8 @@ class StockTradingEnv(gym.Env):
                 if df_total_value['daily_return'].std() != 0:
                     print(f"Sharpe: {sharpe:0.3f}")
                 print("=================================")
+                pltext.plot(tot_reward)
+                pltext.show()
 
             if (self.model_name!='') and (self.mode!=''):
                 df_actions = self.save_action_memory()
@@ -310,7 +311,7 @@ class StockTradingEnv(gym.Env):
                         [self.data.close] + \
                         [0]*self.stock_dim  + \
                         sum([[self.data[tech]] for tech in self.tech_indicator_list ], [])
-                print("state : {self.state}")
+
         else:
             #Using Previous State
             if len(self.df.tic.unique())>1:
