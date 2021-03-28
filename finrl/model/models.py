@@ -32,6 +32,7 @@ from stable_baselines3.common.noise import (
 
 from stable_baselines3 import SAC
 
+from finrl.model.callback import CustomCallback
 
 MODELS = {"a2c": A2C, "ddpg": DDPG, "td3": TD3, "sac": SAC, "ppo": PPO}
 

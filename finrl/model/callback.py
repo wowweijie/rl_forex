@@ -7,6 +7,8 @@ class CustomCallback(BaseCallback):
         self.count = 0
     
     def _on_step(self):
+
+        print(self.locals)
         
         if self.training_env.done:
             self.count += 1
