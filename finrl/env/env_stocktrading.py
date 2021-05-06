@@ -60,6 +60,7 @@ class StockTradingEnv(gym.Env):
         self.mode=mode 
         self.iteration=iteration
         # initalize state
+        # initial_amount, close price, position, technical indicators
         self.state = self._initiate_state()
         
         # initialize reward
