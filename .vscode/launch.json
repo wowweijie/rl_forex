@@ -13,7 +13,7 @@
             "console": "integratedTerminal",
             "internalConsoleOptions": "openOnSessionStart",
             "justMyCode" : false,
-            "python" : "D:\\User\\Anaconda3\\envs\\rl_fx\\python.exe"
+            "python" : "/Users/wongweijie/anaconda3/envs/rl_fx/bin/python"
         }
     ]
 }
