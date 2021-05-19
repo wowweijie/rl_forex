@@ -10,7 +10,6 @@ import pickle
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common import logger
-import plotext as pltext
 
 class StockTradingEnv(gym.Env):
     """A stock trading environment for OpenAI gym"""
@@ -196,10 +195,9 @@ class StockTradingEnv(gym.Env):
             # print(f"Episode: {self.episode}")
             if self.make_plots:
                 self._make_plot()            
-            end_total_asset = self.state[0]+ \
-                sum(np.array(self.state[1:(self.stock_dim+1)])*np.array(self.state[(self.stock_dim+1):(self.stock_dim*2+1)]))
+            end_total_asset = self.state[0]
             df_total_value = pd.DataFrame(self.asset_memory)
-            tot_reward = self.state[0]+sum(np.array(self.state[1:(self.stock_dim+1)])*np.array(self.state[(self.stock_dim+1):(self.stock_dim*2+1)]))- self.initial_amount 
+            tot_reward = end_total_asset - self.initial_amount 
             self.episode_rewards.append(tot_reward)
             df_total_value.columns = ['account_value']
             df_total_value['date'] = self.date_memory
@@ -231,7 +229,7 @@ class StockTradingEnv(gym.Env):
                 plt.close()
 
             # Add outputs to logger interface
-            logger.record("environment/portfolio_value", end_total_asset)
+            logger.record("environment/nop_value", end_total_asset)
             logger.record("environment/total_reward", tot_reward)
             logger.record("environment/total_reward_pct", (tot_reward / (end_total_asset - tot_reward)) * 100)
             logger.record("environment/total_cost", self.cost)
@@ -247,8 +245,7 @@ class StockTradingEnv(gym.Env):
             if self.turbulence_threshold is not None:
                 if self.turbulence>=self.turbulence_threshold:
                     actions=np.array([-self.hmax]*self.stock_dim)
-            begin_total_asset = self.state[0]+ \
-            sum(np.array(self.state[1:(self.stock_dim+1)])*np.array(self.state[(self.stock_dim+1):(self.stock_dim*2+1)]))
+            begin_total_asset = self.state[0]
             #print("begin_total_asset:{}".format(begin_total_asset))
             
             argsort_actions = np.argsort(actions)
@@ -275,8 +272,7 @@ class StockTradingEnv(gym.Env):
                 self.turbulence = self.data['turbulence'].values[0]
             self.state =  self._update_state()
                            
-            end_total_asset = self.state[0]+ \
-            sum(np.array(self.state[1:(self.stock_dim+1)])*np.array(self.state[(self.stock_dim+1):(self.stock_dim*2+1)]))
+            end_total_asset = self.state[0]
             self.asset_memory.append(end_total_asset)
             self.date_memory.append(self._get_date())
             self.reward = end_total_asset - begin_total_asset            
@@ -393,7 +389,6 @@ class StockTradingEnv(gym.Env):
             df_actions = pd.DataFrame(action_list)
             df_actions.columns = self.data.tic.values
             df_actions.index = df_date.date
-            #df_actions = pd.DataFrame({'date':date_list,'actions':action_list})
         else:
             date_list = self.date_memory[:-1]
             action_list = self.actions_memory
