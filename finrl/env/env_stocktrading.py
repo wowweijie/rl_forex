@@ -79,11 +79,6 @@ class StockTradingEnv(gym.Env):
         #initialize episode reward mem
         self.episode_rewards = []
 
-    def _calculate_nop(self) -> float:
-        return sum(
-                    np.array(self.state[1:self.stock_dim+1]) *
-                    np.array(self.state[self.stock_dim+2:self.stock_dim*2+2])
-                ) + self.state[self.stock_dim+1]
         
 
 
@@ -103,9 +98,6 @@ class StockTradingEnv(gym.Env):
 
                     # deduct quote currency balance
                     self.state[quote_ccy_index] -= sell_num_lots
-
-                    #calculate net open position of all currency balance
-                    self.state[0] = self._calculate_nop()
                     
                     self.cost +=self.state[index+1] * sell_num_lots * self.sell_cost_pct
                     self.trades+=1
@@ -161,9 +153,6 @@ class StockTradingEnv(gym.Env):
 
                 #add to quoted currency balance
                 self.state[index+self.stock_dim+2] += buy_num_lots
-
-                #calculate net open position of all currency balance
-                self.state[0] = self._calculate_nop()
                 
                 self.cost+=self.state[index+1] * buy_num_lots * self.buy_cost_pct
                 self.trades+=1
@@ -360,6 +349,12 @@ class StockTradingEnv(gym.Env):
                      [self.data.close] + \
                      list(self.state[(self.stock_dim+1):(self.stock_dim*2+2)]) + \
                      sum([[self.data[tech]] for tech in self.tech_indicator_list ], [])
+        
+        #calculate net open position of all currency balance
+        state[0] = sum(
+                    np.array(state[1:self.stock_dim+1]) *
+                    np.array(state[self.stock_dim+2:self.stock_dim*2+2])
+                ) + state[self.stock_dim+1]
                           
         return state
 
