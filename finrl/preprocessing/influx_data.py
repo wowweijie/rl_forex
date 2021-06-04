@@ -15,77 +15,6 @@ import pytz
 
 client = DataFrameClient(host='localhost', port=8086)
 
-
-def load_from_influx_chicago(currency_pair: str, window_period: int): 
-    """load single currency pair tick data from Influx db
-
-    Args:
-        currency_pair (str) : for e.g. "EURUSD" 
-        window_period (int) : from a window_period seconds before an event trigger until a 
-                            window_period seconds after. window_frame is twice that of the
-                            window_period.
-
-    Returns:
-        list of pandas dataframe
-    """
-
-    client = InfluxDBClient(host='localhost', port=8086)
-
-    chicago_pmi = pd.read_csv(f"{config.REF_DATA_SAVE_DIR}/Chicago_PMI_releases.csv", header=None)
-    for index, row in chicago_pmi.iterrows():
-        eastern_tz = pytz.timezone('Asia/Singapore')
-        current_day = datetime.strptime(row[0][:12], '%b %d, %Y')
-        current_day = eastern_tz.localize(current_day)
-        time_array = row[1].split(":")
-        local_time = timedelta(hours = int(time_array[0]) + 12, minutes = int(time_array[1]))
-        news_time = current_day + local_time
-        print(news_time.strftime("%d/%m/%Y, %H:%M:%S%z"))
-        timestamp = news_time.timestamp()
-        print(timestamp)
-        chicago_pmi.iloc[index, 5] = timestamp
-        
-    for _, event_timestamp in chicago_pmi.loc[(chicago_pmi[5]<1577836800) & (chicago_pmi[5]>1356998400),5].iteritems():
-        lower_limit_timestamp = event_timestamp - window_period
-        upper_limit_timestamp = event_timestamp + window_period
-
-        
-        query_statement = 'select "bid", "ask", "bid_vol", "ask_vol" from "dukascopy"."autogen"."EURUSD" where time >= ' +\
-        str(int(lower_limit_timestamp)) + '000000000' +\
-        ' and time <= ' + str(int(upper_limit_timestamp)) + '000000000 order by time asc' 
-        
-        
-        results = client.query(query_statement)
-        time_values = []
-        bid_values = []
-        ask_values = []
-        
-        df = pd.DataFrame(columns = ["time", "bid", "ask", "bid_vol", "ask_vol"])
-        
-        for point in results.get_points(): 
-            
-            try : 
-                date_time_value = datetime.strptime(point["time"], '%Y-%m-%dT%H:%M:%S.%fZ')
-            except : 
-                date_time_value = datetime.strptime(point["time"], '%Y-%m-%dT%H:%M:%SZ')
-                
-            time_values.append(date_time_value)
-            bid_values.append(point["bid"])
-            ask_values.append(point["ask"])
-            
-    
-            row = {"time" : date_time_value,
-                "bid" : point["bid"], 
-                "ask" : point["ask"],
-                "bid_vol" : point["bid_vol"],
-                "ask_vol" : point["ask_vol"],
-                }
-            
-            df = df.append(row, ignore_index = True)
-            
-        
-        
-    return df
-
 def load_from_influx_query(currency_pair : str, start_date_time : str, end_date_time : str):
     """load currency pair tick data from influx through a timeframe query
 
@@ -104,7 +33,7 @@ def load_from_influx_query(currency_pair : str, start_date_time : str, end_date_
     start_timestamp = start_datetime.timestamp()
     end_timestamp = end_datetime.timestamp()
 
-    query_statement = 'select "bid", "ask", "bid_vol", "ask_vol" from "dukascopy".."EURUSD" where time >= ' +\
+    query_statement = f'select "Bid price", "Ask price", "Bid volume", "Ask volume" from "dukascopy".."{currency_pair}" where time >= ' +\
         str(int(start_timestamp)) + '000000000' +\
         ' and time <= ' + str(int(end_timestamp)) + '000000000 order by time asc'
 
@@ -112,11 +41,20 @@ def load_from_influx_query(currency_pair : str, start_date_time : str, end_date_
 
     results = client.query(query_statement)
 
-    df = pd.DataFrame.from_dict(results[currency_pair], orient='columns')    
+    df = pd.DataFrame.from_dict(results[currency_pair], orient='columns')
+
+    df.rename(columns={
+        'Bid price' : 'bid',
+        'Ask price' : 'ask',
+        'Bid volume' : 'bid_vol',
+        'Ask volume' : 'ask_vol'
+    }, inplace=True) 
+
+    df = df.astype("float64")   
 
     return df
 
-def export_csv_aggregated_from_influx(currency_pair : str, start_date_time : str, end_date_time : str, ohlc_interval: str, file_path : str):
+def export_csv_aggregated_from_influx(currency_pair : str, start_date_time : str, end_date_time : str, ohlc_interval: str):
     """export a continuous window of ohlc data aggregated in a specified time interval to specified file path
 
     Args:
@@ -142,83 +80,5 @@ def export_csv_aggregated_from_influx(currency_pair : str, start_date_time : str
     fillna_values = dict.fromkeys((('ask', col) for col in df['ask'].columns.tolist()),df['ask']['close'].ffill())
     fillna_values.update(dict.fromkeys((('bid', col) for col in df['bid'].columns.tolist()),df['bid']['close'].ffill()))
     df.fillna(fillna_values, inplace = True)
-    print(df)
-    export_dataset(df, file_path)
 
     return df
-
-    
-
-def export_csv_from_influx_chicago(currency_pair: str, window_period: int, dir_path: str) :
-    """exports as csv a single currency pair tick data from Influx db between a certain
-        window period before and after Chicago PMI
-
-    Args:
-        currency_pair (str) : for e.g. "EURUSD" 
-        window_period (int) : from a window_period seconds before an event trigger until a 
-                            window_period seconds after. window_frame is twice that of the
-                            window_period.
-        dir_path (str) : specify a dir path from dataset folder to export csv to. for e.g. 
-                            chicago_pmi/EURUSD/raw
-
-    Returns:
-        None
-    """ 
-    client = InfluxDBClient(host='localhost', port=8086)
-
-
-    chicago_pmi = pd.read_csv(f"{config.REF_DATA_SAVE_DIR}/Chicago_PMI_releases.csv", header=None)
-    for index, row in chicago_pmi.iterrows():
-        eastern_tz = pytz.timezone('Asia/Singapore')
-        current_day = datetime.strptime(row[0][:12], '%b %d, %Y')
-        current_day = eastern_tz.localize(current_day)
-        time_array = row[1].split(":")
-        local_time = timedelta(hours = int(time_array[0]) + 12, minutes = int(time_array[1]))
-        news_time = current_day + local_time
-        print(news_time.strftime("%d/%m/%Y, %H:%M:%S%z"))
-        timestamp = news_time.timestamp()
-        print(timestamp)
-        chicago_pmi.iloc[index, 5] = timestamp
-        
-    for _, event_timestamp in chicago_pmi.loc[(chicago_pmi[5]<1577836800) & (chicago_pmi[5]>1356998400),5].iteritems():
-        lower_limit_timestamp = event_timestamp - window_period
-        upper_limit_timestamp = event_timestamp + window_period
-
-        
-        query_statement = f'select "bid", "ask", "bid_vol", "ask_vol" from "dukascopy"."autogen"."{currency_pair}" where time >= ' +\
-        str(int(lower_limit_timestamp)) + '000000000' +\
-        ' and time <= ' + str(int(upper_limit_timestamp)) + '000000000 order by time asc' 
-        
-        
-        results = client.query(query_statement)
-        time_values = []
-        bid_values = []
-        ask_values = []
-        
-        df = pd.DataFrame(columns = ["time", "bid", "ask", "bid_vol", "ask_vol"])
-        
-        for point in results.get_points(): 
-            
-            try : 
-                date_time_value = datetime.strptime(point["time"], '%Y-%m-%dT%H:%M:%S.%fZ')
-            except : 
-                date_time_value = datetime.strptime(point["time"], '%Y-%m-%dT%H:%M:%SZ')
-                
-            time_values.append(date_time_value)
-            bid_values.append(point["bid"])
-            ask_values.append(point["ask"])
-            
-    
-            row = {"time" : point["time"],
-                "bid" : point["bid"], 
-                "ask" : point["ask"],
-                "bid_vol" : point["bid_vol"],
-                "ask_vol" : point["ask_vol"],
-                }
-            
-            df = df.append(row, ignore_index = True)
-        
-        
-        df.to_csv(f'{config.DATASET_DIR}/{dir_path}/{currency_pair}_Chicago_Pmi_' + datetime.fromtimestamp(event_timestamp).strftime('%Y-%m-%d') + ".csv", index = False)    
-
-    return None

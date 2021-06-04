@@ -102,6 +102,12 @@ class FeatureEngineer:
         #drop all na values
         self.df.dropna(inplace=True)
 
+        # reset index
+        self.df.reset_index(inplace = True, col_fill={'index':'date'})
+        self.df.rename(columns={
+            "index" : "date"
+        }, inplace=True)
+
         return self.df
 
 
