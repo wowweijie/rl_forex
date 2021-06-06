@@ -29,7 +29,6 @@ class FeatureEngineer:
         df,
         use_technical_indicator=True,
         user_defined_feature = True,
-        tech_indicator_list = config.TECHNICAL_INDICATORS_LIST,
         tech_indicator_params_map = {
                 'SMA': {'time_period' : 20}, #time_period in seoonds
                 'EMA': {'time_period' : 20}, #time_period in seoonds
@@ -39,7 +38,6 @@ class FeatureEngineer:
         self.df = df
         self.use_technical_indicator = use_technical_indicator
         self.user_defined_feature = user_defined_feature
-        self.tech_indicator_list = tech_indicator_list
         self.tech_indicator_parameter_map = copy.deepcopy(tech_indicator_params_map)
 
         #type_list = self._get_type_list(5)
@@ -84,7 +82,7 @@ class FeatureEngineer:
         if (self.use_technical_indicator==True):
             
             # add technical indicators using stockstats
-            self.add_technical_indicator()
+            tech_indicator_list = self.add_technical_indicator()
             print("Successfully added technical indicators")
 
         # add user defined feature
@@ -103,12 +101,12 @@ class FeatureEngineer:
         self.df.dropna(inplace=True)
 
         # reset index
-        self.df.reset_index(inplace = True, col_fill={'index':'date'})
-        self.df.rename(columns={
-            "index" : "date"
-        }, inplace=True)
+        # self.df.reset_index(inplace = True, col_fill={'index':'date'})
+        # self.df.rename(columns={
+        #     "index" : "date"
+        # }, inplace=True)
 
-        return self.df
+        return self.df, tech_indicator_list
 
 
     def add_technical_indicator(self):
@@ -118,8 +116,8 @@ class FeatureEngineer:
         Returns:
             pandas dataframe of OHLCV dataframe with technical indicators and generated columns
         """
-        
-        for indicator in self.tech_indicator_list:
+        processed_indicator_list = []
+        for indicator in list(self.tech_indicator_parameter_map.keys()):
             try :
                 params = self.tech_indicator_parameter_map.get(indicator)
                 talib_name = params.pop('talib_name')
@@ -134,16 +132,20 @@ class FeatureEngineer:
 
                 if type(new_features) is pd.Series: 
                     self.df['ovr', indicator] =  new_features
+                    processed_indicator_list.append(indicator)
                 
                 elif type(new_features) is pd.DataFrame:
                     for colname in list(new_features.columns):
                         modified_colname = indicator + "_" + colname
                         self.df.loc[:,('ovr', modified_colname)] =  new_features[colname]
+                        processed_indicator_list.append(modified_colname)
 
             
             except Exception as err:
                 print(f'{indicator} does not exist or has wrong parameters, ', err)
                 continue
+        
+        return processed_indicator_list
             
 
 
