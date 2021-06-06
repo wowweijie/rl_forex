@@ -388,7 +388,7 @@ class StockTradingEnv(gym.Env):
             
             action_list = self.actions_memory
             df_actions = pd.DataFrame(action_list)
-            df_actions.columns = self.data.tic.values
+            df_actions.columns = self.ccy_list
             df_actions.index = df_date.date
         # else:
         #     date_list = self.date_memory[:-1]
