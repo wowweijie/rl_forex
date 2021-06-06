@@ -86,7 +86,7 @@ class StockTradingEnv(gym.Env):
     def _calculate_nop(self) -> float:
         return sum(
                     np.array(self.state[1:self.stock_dim+1]) *
-                    np.array(self.state[self.stock_dim+1:self.stock_dim*2+1])
+                    np.array(self.state[self.stock_dim*2+1:self.stock_dim*3+1])
                 ) + self.state[0]
         
 
