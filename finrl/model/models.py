@@ -32,7 +32,7 @@ from stable_baselines3.common.noise import (
 
 from stable_baselines3 import SAC
 
-from finrl.model.callback import CustomCallback
+from finrl.callbacks.callback import CustomCallback
 
 MODELS = {"a2c": A2C, "ddpg": DDPG, "td3": TD3, "sac": SAC, "ppo": PPO}
 
@@ -78,11 +78,13 @@ class DRLAgent:
         for i in range(len(test_env.df.index)):
             action, _states = model.predict(test_obs)
             test_obs, rewards, dones, info = test_vec_env.step(action)
-            if i == (len(test_env.df.index) - 2):
-                account_memory = test_vec_env.env_method(method_name="save_asset_memory")
-                actions_memory = test_vec_env.env_method(method_name="save_action_memory")
+            account_memory.append(rewards)
+            actions_memory.append(action)
+            # if i == (len(test_env.df.index) - 2):
+            #     account_memory = test_vec_env.env_method(method_name="save_asset_memory")
+            #     actions_memory = test_vec_env.env_method(method_name="save_action_memory")
         end = time.time()
-        return account_memory[0], actions_memory[0]
+        return account_memory, actions_memory
 
     def __init__(self, env):
         self.env = env
