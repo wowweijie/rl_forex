@@ -7,6 +7,42 @@ import matplotlib.pyplot as plt
 
 from finrl.marketdata.yahoodownloader import YahooDownloader
 from finrl.config import config
+from stable_baselines3.common.vec_env import VecEnv
+from stable_baselines3.common.base_class import BaseAlgorithm
+from typing import List, Tuple
+
+def evaluate_policy_rewards(
+    model: BaseAlgorithm,
+    env: VecEnv,
+    n_eval_episodes: int = 10,
+    deterministic: bool = True,
+    render: bool = False
+) -> Tuple[List[float], List[int], List[int]]:
+
+    if isinstance(env, VecEnv):
+            assert env.num_envs == 1, "You must pass only one environment when using this function"
+    episode_rewards, episode_lengths, rewards_memory_episodes= [], [], []
+    for i in range(n_eval_episodes):
+
+        if not isinstance(env, VecEnv) or i == 0:
+            obs = env.reset()
+        rewards_memory = []
+        done, state = False, None
+        episode_reward = 0.0
+        episode_length = 0
+        while not done:
+            action, state = model.predict(obs, state=state, deterministic=deterministic)
+            obs, reward, done, _info = env.step(action)
+            rewards_memory.append(reward)
+            episode_reward += reward
+            episode_length += 1
+            if render:
+                env.render()
+        rewards_memory_episodes.append(rewards_memory)
+        episode_rewards.append(episode_reward)
+        episode_lengths.append(episode_length)
+
+    return episode_rewards, episode_lengths, rewards_memory_episodes
 
 
 def BackTestStats(account_value):
