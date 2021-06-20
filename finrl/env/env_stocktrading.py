@@ -39,6 +39,9 @@ class StockTradingEnv(gym.Env):
         #concat dfs into one
         df = pd.concat(list(dfs_list.values()), axis = 1, keys = list(dfs_list.keys()))
         df.reset_index(inplace = True, col_fill='date')
+
+        #differentiate USD quoted currency as True, and the rest as False
+        self.usd_quoted = list(map(lambda symbol: symbol[-3:]=="USD", dfs_list.keys()))
         self.ccy_list = list(dfs_list.keys())
         self.df = df
         self.stock_dim = len(self.ccy_list) 
@@ -85,36 +88,54 @@ class StockTradingEnv(gym.Env):
 
     def _calculate_nop(self) -> float:
         return sum(
-                    np.array(self.state[1:self.stock_dim+1]) *
-                    np.array(self.state[self.stock_dim*2+1:self.stock_dim*3+1])
+                    np.array(self.state[1:self.stock_dim+1]) *\
+                    np.array(self.state[self.stock_dim*2+1:self.stock_dim*3+1]) *\
+                    np.array(list(map(lambda x : 1 if x else 0, self.usd_quoted)))
+                ) + sum(
+                    np.array(self.state[self.stock_dim*2+1:self.stock_dim*3+1]) /\
+                    np.array(self.state[1:self.stock_dim+1]) *\
+                    np.array(list(map(lambda x : 0 if x else 1, self.usd_quoted)))
                 ) + self.state[0]
         
 
 
     def _sell_stock(self, index, action):
         def _do_sell_normal():
-            x_ccy_index = index+2*self.stock_dim+1
-            close_price_index = index+1
-            if self.state[index+1]>0: 
-                # Sell only if the price is > 0 (no missing data in this particular date)
-                # perform sell action based on the sign of the action
-                if self.state[x_ccy_index] > 0:
-                    # Sell only if current asset is > 0
-                    sell_num_lots = min(abs(action),self.state[x_ccy_index])
-                    sell_amount = self.state[close_price_index] * sell_num_lots * (1- self.sell_cost_pct)
-                    
-                    # increase USD balance
-                    self.state[0] += sell_amount
 
-                    # deduct non-USD currency balance
-                    self.state[x_ccy_index] -= sell_num_lots
+            # For USD-quoted currencies, i.e. GBPUSD, EURUSD
+            if self.usd_quoted[index]:
+                base_ccy_index = index+2*self.stock_dim+1
+                quote_ccy_index = 0
+
+            # For USD-based currencies, i.e. USDCHF, USDJPY
+            else:  
+                base_ccy_index = 0
+                quote_ccy_index = index+2*self.stock_dim+1
+
+            close_price_index = index+1
+            close_price = self.state[close_price_index]
+
+            # Sell only if the price is > 0 (no missing data in this particular date)
+            # Sell only if current asset is > 0
+            if self.state[index+1]>0 and self.state[base_ccy_index] > 0:
                     
-                    self.cost +=self.state[close_price_index] * sell_num_lots * self.sell_cost_pct
-                    self.trades+=1
-                else:
-                    sell_num_lots = 0
+                sell_num_lots = min(abs(action),self.state[base_ccy_index])
+                sell_amount = close_price * sell_num_lots
+                cost = sell_amount * self.sell_cost_pct
+                self.cost += cost
+                
+                # increase USD balance for USD-quoted currencies, i.e. GBPUSD, EURUSD
+                # increase non-USD balance for USD-based currencies, i.e. USDCHF, USDJPY
+                self.state[quote_ccy_index] += sell_amount - cost
+
+                # deduct USD balance for USD-quoted currencies, i.e. GBPUSD, EURUSD
+                # deduct non-USD balance for USD-based currencies, i.e. USDCHF, USDJPY
+                self.state[base_ccy_index] -= sell_num_lots
+                
+                self.trades+=1
             else:
                 sell_num_lots = 0
+
 
             return sell_num_lots
             
@@ -149,24 +170,40 @@ class StockTradingEnv(gym.Env):
     def _buy_stock(self, index, action):
 
         def _do_buy():
-            x_ccy_index = index+2*self.stock_dim+1
+            # For USD-quoted currencies, i.e. GBPUSD, EURUSD
+            if self.usd_quoted[index]:
+                base_ccy_index = index+2*self.stock_dim+1
+                quote_ccy_index = 0
+
+            # For USD-based currencies, i.e. USDCHF, USDJPY
+            else:  
+                base_ccy_index = 0
+                quote_ccy_index = index+2*self.stock_dim+1
+
             close_price_index = self.stock_dim+index+1
-            if self.state[index+1]>0: 
-                #Buy only if the price is > 0 (no missing data in this particular date)       
-                available_amount = self.state[0] // self.state[close_price_index]
-                # print('available_amount:{}'.format(available_amount))
+            close_price = self.state[close_price_index]
+
+            # Buy only if the price is > 0 (no missing data in this particular date)
+            # Buy only if current asset is > 0
+            if self.state[index+1]>0 and self.state[quote_ccy_index]>0: 
+
+                # Quote currency balance available for buy order       
+                available_amount = self.state[quote_ccy_index] // close_price
                 
-                #update balance
+                # Update balance
                 buy_num_lots = min(available_amount, action)
-                buy_amount = self.state[close_price_index] * buy_num_lots * (1+ self.buy_cost_pct)
+                buy_amount = close_price * buy_num_lots * (1+ self.buy_cost_pct)
+                cost = buy_amount * self.buy_cost_pct
+                self.cost += cost
 
-                #deduct USD balance
-                self.state[0] -= buy_amount
+                # deduct USD balance for USD-quoted currencies, i.e. GBPUSD, EURUSD
+                # deduct non-USD balance for USD-based currencies, i.e. USDCHF, USDJPY
+                self.state[quote_ccy_index] -= buy_amount + self.cost
 
-                #add to non-USD balance
-                self.state[x_ccy_index] += buy_num_lots
-                
-                self.cost+=self.state[close_price_index] * buy_num_lots * self.buy_cost_pct
+                # increase USD balance for USD-quoted currencies, i.e. GBPUSD, EURUSD
+                # increase non-USD balance for USD-based currencies, i.e. USDCHF, USDJPY
+                self.state[base_ccy_index] += buy_num_lots
+
                 self.trades+=1
             else:
                 buy_num_lots = 0

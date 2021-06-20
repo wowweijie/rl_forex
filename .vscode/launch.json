@@ -13,7 +13,7 @@
             "console": "integratedTerminal",
             "internalConsoleOptions": "openOnSessionStart",
             "justMyCode" : false,
-            "python" : "C:\\Users\\jasmi\\miniconda3\\envs\\rl_fx\\python.exe"
+            "python" : "C:\\Users\\User\\miniconda3\\envs\\rl_fx\\python.exe"
         }
     ]
 }
