@@ -33,8 +33,8 @@ def evaluate_policy_rewards(
         while not done:
             action, state = model.predict(obs, state=state, deterministic=deterministic)
             obs, reward, done, _info = env.step(action)
-            rewards_memory.append(reward)
-            episode_reward += reward
+            rewards_memory.append(reward[0])
+            episode_reward += reward[0]
             episode_length += 1
             if render:
                 env.render()
