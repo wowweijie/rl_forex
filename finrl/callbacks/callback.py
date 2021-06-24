@@ -1,4 +1,5 @@
 from stable_baselines3.common.callbacks import BaseCallback
+import numpy as np
 
 class CustomCallback(BaseCallback):
     
@@ -44,24 +45,24 @@ class CustomCallback(BaseCallback):
         """
         pass
 
-    class EvaluateCallbackInstance:
-    
-        def __init__(self):
-            self.rewards_arrays = []
+class EvaluateCallbackInstance:
+
+    def __init__(self):
+        self.rewards_arrays = []
+        self.reward_array_run = []
+        self.result = None
+        self.ccy_dims = 0
+        self.local = None
+        self.count = 0
+
+    def evaluateCallback(self, locals_, globals_):
+
+        if self.count == 0 :
+            self.local = np.copy(locals_["obs"])
+            self.count += 1
+
+        self.reward_array_run.append(locals_["reward"][0])
+        
+        if locals_["done"]:
+            self.rewards_arrays.append(self.reward_array_run)
             self.reward_array_run = []
-            self.result = None
-            self.ccy_dims = 0
-            self.local = None
-            self.count = 0
-
-        def evaluateCallback(self, locals_, globals_):
-
-            if self.count == 0 :
-                self.local = np.copy(locals_["obs"])
-                self.count += 1
-
-            self.reward_array_run.append(locals_["reward"][0])
-            
-            if locals_["done"]:
-                self.rewards_arrays.append(self.reward_array_run)
-                self.reward_array_run = []
