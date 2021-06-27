@@ -47,7 +47,8 @@ def evaluate_lstm_rewards(
     model,
     env,
     model_input_space: int,
-    n_eval_episodes: int = 10,
+    monthdata: str,
+    n_eval_episodes: int = 5,
     deterministic: bool = True,
     render: bool = False
 ):
@@ -78,9 +79,6 @@ def evaluate_lstm_rewards(
             episode_length += 1
             if render:
                 env.render()
-        print(state)
-        with open('saved_models/hidden_states/model-1.npy', 'wb') as f:
-            np.save(f, state)
         rewards_memory_episodes.append(rewards_memory)
         episode_rewards.append(episode_reward)
         episode_lengths.append(episode_length)
