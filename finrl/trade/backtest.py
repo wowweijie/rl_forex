@@ -43,6 +43,50 @@ def evaluate_policy_rewards(
 
     return episode_rewards, episode_lengths, rewards_memory_episodes
 
+def evaluate_lstm_rewards(
+    model,
+    env,
+    model_input_space: int,
+    n_eval_episodes: int = 10,
+    deterministic: bool = True,
+    render: bool = False
+):
+
+    if isinstance(env, VecEnv):
+            assert env.num_envs == 1, "You must pass only one environment when using this function"
+    episode_rewards, episode_lengths, rewards_memory_episodes= [], [], []
+    for i in range(n_eval_episodes):
+
+        if not isinstance(env, VecEnv) or i == 0:
+            obs = env.reset()
+        rewards_memory = []
+        done, state = False, None
+        episode_reward = 0.0
+        episode_length = 0
+        action = None
+        reward = None
+        while not done:
+            # meta RL - add previous action and previous reward to observation 
+            if action is not None and reward is not None:
+                meta_obs = np.concatenate([np.copy(obs), np.array(action), np.array([reward])], axis = 1)
+            else:
+                meta_obs = np.concatenate([np.copy(obs), np.zeros((1,model_input_space-obs.shape[1]))], axis = 1)
+            action, state = model.predict(meta_obs, state=state, deterministic=deterministic)
+            obs, reward, done, _info = env.step(action)
+            rewards_memory.append(reward[0])
+            episode_reward += reward[0]
+            episode_length += 1
+            if render:
+                env.render()
+        print(state)
+        with open('saved_models/hidden_states/model-1.npy', 'wb') as f:
+            np.save(f, state)
+        rewards_memory_episodes.append(rewards_memory)
+        episode_rewards.append(episode_reward)
+        episode_lengths.append(episode_length)
+
+    return episode_rewards, episode_lengths, rewards_memory_episodes
+
 
 def BackTestStats(account_value):
     df = account_value.copy()
