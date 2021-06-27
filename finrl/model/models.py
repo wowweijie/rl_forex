@@ -8,11 +8,10 @@ import gym
 # from stable_baselines import SAC
 # from stable_baselines import TD3
 
-from stable_baselines3.ppo import MlpPolicy
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines.common.vec_env import DummyVecEnv
 
-from stable_baselines3 import DDPG
-from stable_baselines3.common.noise import (
+from stable_baselines import DDPG
+from stable_baselines.common.noise import (
     NormalActionNoise,
     OrnsteinUhlenbeckActionNoise,
 )
@@ -21,20 +20,19 @@ from finrl.config import config
 from finrl.preprocessing.data import data_split
 from finrl.env.env_stocktrading import StockTradingEnv
 
-from stable_baselines3 import A2C
-from stable_baselines3 import PPO
-from stable_baselines3 import TD3
-from stable_baselines3.td3.policies import MlpPolicy
-from stable_baselines3.common.noise import (
+from stable_baselines import A2C
+from stable_baselines import ppo1
+from stable_baselines import TD3
+from stable_baselines.common.noise import (
     NormalActionNoise,
     OrnsteinUhlenbeckActionNoise,
 )
 
-from stable_baselines3 import SAC
+from stable_baselines import SAC
 
 from finrl.callbacks.callback import CustomCallback
 
-MODELS = {"a2c": A2C, "ddpg": DDPG, "td3": TD3, "sac": SAC, "ppo": PPO}
+MODELS = {"a2c": A2C, "ddpg": DDPG, "td3": TD3, "sac": SAC, "ppo": ppo1}
 
 MODEL_KWARGS = {x: config.__dict__[f"{x.upper()}_PARAMS"] for x in MODELS.keys()}
 

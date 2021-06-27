@@ -7,12 +7,11 @@ import matplotlib.pyplot as plt
 
 from finrl.marketdata.yahoodownloader import YahooDownloader
 from finrl.config import config
-from stable_baselines3.common.vec_env import VecEnv
-from stable_baselines3.common.base_class import BaseAlgorithm
+from stable_baselines.common.vec_env import VecEnv
 from typing import List, Tuple
 
 def evaluate_policy_rewards(
-    model: BaseAlgorithm,
+    model,
     env: VecEnv,
     n_eval_episodes: int = 10,
     deterministic: bool = True,
