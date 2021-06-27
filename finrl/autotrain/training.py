@@ -21,6 +21,7 @@ from empyrical import sortino_ratio
 from bayes_opt import BayesianOptimization
 from bayes_opt.logger import JSONLogger
 from bayes_opt.event import Events
+from random import sample
 
 from finrl.config import config
 from finrl.preprocessing.preprocessors import FeatureEngineer
@@ -44,15 +45,7 @@ def continual_training():
     train_iteration(3,17)
     train_iteration(4,17)
 
-def train_iteration(month: int, year: int):
-
-    if month < 10:
-        str_month = "0" + str(month)
-    else:
-        str_month = str(month)
-    monthdata = str_month + '_' + str(year)
-    print(monthdata)
-
+def create_env_kwargs(monthdata: str):
     EURUSD_df=load_ohlc_dataset(f"15min/EURUSD/{monthdata}.csv")
     GBPUSD_df=load_ohlc_dataset(f"15min/GBPUSD/{monthdata}.csv")
     USDJPY_df=load_ohlc_dataset(f"15min/USDJPY/{monthdata}.csv")
@@ -109,11 +102,11 @@ def train_iteration(month: int, year: int):
 
     stock_dimension = len(dfs_list)
     state_space = 1 + 3*stock_dimension + len(tech_indicator_list)*stock_dimension
-    print(f"Stock Dimension: {stock_dimension}, State Space: {state_space}")
+    print(f"Observation Dimension: {stock_dimension}, State Space: {state_space}")
     model_input_space = 2 + 4*stock_dimension + len(tech_indicator_list)*stock_dimension
     print(f"Input Dimension: {stock_dimension}, State Space: {state_space}")
 
-    env_kwargs = {
+    return {
         "hmax": 10000, 
         "dfs_list" : dfs_list,
         "initial_amount": 100000, 
@@ -123,7 +116,18 @@ def train_iteration(month: int, year: int):
         "tech_indicator_list": tech_indicator_list, 
         "action_space": stock_dimension, 
         "reward_scaling": 1e-4
-    }
+    }, len(EURUSD_train), model_input_space
+
+def train_iteration(month: int, year: int):
+
+    if month < 10:
+        str_month = "0" + str(month)
+    else:
+        str_month = str(month)
+    monthdata = str_month + '_' + str(year)
+    print(monthdata)
+
+    env_kwargs, env_timesteps, model_input_space = create_env_kwargs(monthdata)
 
     prev_month = month - 1
     if prev_month < 10:
@@ -132,10 +136,13 @@ def train_iteration(month: int, year: int):
         str_prev_month = str(prev_month)
 
     bo_iter = 0
+    test_month = draw_month(month)
     
     def A2C_train(learning_rate_val, epsilon):
 
         nonlocal bo_iter
+        nonlocal model_input_space
+        nonlocal test_month
 
         start = time.time()
 
@@ -146,8 +153,8 @@ def train_iteration(month: int, year: int):
 
         env_train, _ = e_train_gym.get_sb_env()
         
-        num_episodes = 100
-        total_timesteps = num_episodes * len(EURUSD_train)
+        num_episodes = 200
+        total_timesteps = num_episodes * env_timesteps
 
         # if previous month's log data is not found
         if not os.path.isfile(f'results/{str_prev_month}_{year}/BO_logs.json'):
@@ -174,13 +181,23 @@ def train_iteration(month: int, year: int):
 
         trained_a2c, hidden_states = model_a2c.learn(total_timesteps=total_timesteps, tb_log_name='a2c')
 
+        # get performance on trained environment 
         env_train, _ = e_train_gym.get_sb_env()
-        episodes_rewards, episode_lengths, rewards_memory_episodes = evaluate_lstm_rewards(trained_a2c, env_train, model_input_space, monthdata, deterministic=False)
+        train_episodes_rewards, _, train_rewards_memory_episodes = evaluate_lstm_rewards(trained_a2c, env_train, model_input_space, monthdata, deterministic=False)
+        
+        # get performance on sampled environment from 2017
+        test_env_kwargs, _, model_input_space =create_env_kwargs(test_month)
+        e_test_gym = StockTradingEnv(**test_env_kwargs)
+        env_test, _ = e_test_gym.get_sb_env()
+        episodes_rewards, _, rewards_memory_episodes = evaluate_lstm_rewards(trained_a2c, env_test, model_input_space, monthdata, deterministic=False)
+
+        combined_episodes_rewards = train_episodes_rewards + episodes_rewards
+        combined_rewards_memory = train_rewards_memory_episodes[0] + rewards_memory_episodes[0]
 
         fig, axs = plt.subplots()
 
         axs.plot(list(accumulate(rewards_memory_episodes[0])))
-        axs.set_title("Accumulated rewards (Gains in NOP) against timesteps")
+        axs.set_title(f"Accumulated rewards (Gains in NOP) against timesteps in {test_month}/17")
         fig.tight_layout()
 
         fig.savefig(f'plots/bo_results/{monthdata}/iteration_{bo_iter}')
@@ -190,10 +207,10 @@ def train_iteration(month: int, year: int):
             with open(f"saved_models/{monthdata}/hidden_state-{bo_iter}.npy", 'wb') as f:
                 np.save(f, hidden_states)
 
-        mean_reward = mean(episodes_rewards)
+        mean_reward = mean(combined_episodes_rewards)
         print("Mean Episodic Reward : ", mean_reward)
 
-        sortino = sortino_ratio(pd.Series(rewards_memory_episodes[0]))
+        sortino = sortino_ratio(pd.Series(combined_rewards_memory))
         print("Sortino Ratio :", sortino)
 
         end = time.time()
@@ -248,6 +265,12 @@ def load_best(monthdata: str, model_input_space: int):
     print("params:", target_params)
     model = A2C.load(f"saved_models/{monthdata}/model-{target_index+1}", model_input_space)
     return model, target_params
+
+def draw_month(current_month: int):
+    months = list(range(1,13))
+    months.remove(current_month)
+    select = sample(months, 1)
+    return select
 
 def train_one():
     """
