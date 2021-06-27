@@ -75,11 +75,7 @@ class StockTradingEnv(gym.Env):
         self.cost = 0
         self.trades = 0
         self.episode = 0
-        # memorize all the total balance change
-        self.asset_memory = [self.initial_amount]
-        self.rewards_memory = []
-        self.actions_memory=[]
-        self.date_memory=[self._get_date()]
+
         #self.reset()
         self._seed()
 
@@ -100,171 +96,101 @@ class StockTradingEnv(gym.Env):
 
 
     def _sell_stock(self, index, action):
-        def _do_sell_normal():
 
-            # For USD-quoted currencies, i.e. GBPUSD, EURUSD
-            if self.usd_quoted[index]:
-                base_ccy_index = index+2*self.stock_dim+1
-                quote_ccy_index = 0
+        # For USD-quoted currencies, i.e. GBPUSD, EURUSD
+        if self.usd_quoted[index]:
+            base_ccy_index = index+2*self.stock_dim+1
+            quote_ccy_index = 0
 
-            # For USD-based currencies, i.e. USDCHF, USDJPY
-            else:  
-                base_ccy_index = 0
-                quote_ccy_index = index+2*self.stock_dim+1
+        # For USD-based currencies, i.e. USDCHF, USDJPY
+        else:  
+            base_ccy_index = 0
+            quote_ccy_index = index+2*self.stock_dim+1
 
-            close_price_index = index+1
-            close_price = self.state[close_price_index]
+        close_price_index = index+1
+        close_price = self.state[close_price_index]
 
-            # Sell only if the price is > 0 (no missing data in this particular date)
-            # Sell only if current asset is > 0
-            if self.state[index+1]>0 and self.state[base_ccy_index] > 0:
-                    
-                sell_num_lots = min(abs(action),self.state[base_ccy_index])
-                sell_amount = close_price * sell_num_lots
-                cost = sell_amount * self.sell_cost_pct
-                self.cost += cost
+        # Sell only if the price is > 0 (no missing data in this particular date)
+        # Sell only if current asset is > 0
+        if self.state[index+1]>0 and self.state[base_ccy_index] > 0:
                 
-                # increase USD balance for USD-quoted currencies, i.e. GBPUSD, EURUSD
-                # increase non-USD balance for USD-based currencies, i.e. USDCHF, USDJPY
-                self.state[quote_ccy_index] += sell_amount - cost
-
-                # deduct USD balance for USD-quoted currencies, i.e. GBPUSD, EURUSD
-                # deduct non-USD balance for USD-based currencies, i.e. USDCHF, USDJPY
-                self.state[base_ccy_index] -= sell_num_lots
-                
-                self.trades+=1
-            else:
-                sell_num_lots = 0
-
-
-            return sell_num_lots
+            sell_num_lots = min(abs(action),self.state[base_ccy_index])
+            sell_amount = close_price * sell_num_lots
+            cost = sell_amount * self.sell_cost_pct
+            self.cost += cost
             
-        # perform sell action based on the sign of the action
-        if self.turbulence_threshold is not None:
-            if self.turbulence>=self.turbulence_threshold:
-                if self.state[index+1]>0: 
-                    # Sell only if the price is > 0 (no missing data in this particular date)
-                    # if turbulence goes over threshold, just clear out all positions 
-                    if self.state[index+self.stock_dim+1] > 0:
-                        # Sell only if current asset is > 0
-                        sell_num_lots = self.state[index+self.stock_dim+1]
-                        sell_amount = self.state[index+1]*sell_num_lots* (1- self.sell_cost_pct)
-                        #update balance
-                        self.state[0] += sell_amount
-                        self.state[index+self.stock_dim+1] =0
-                        self.cost += self.state[index+1]*self.state[index+self.stock_dim+1]* \
-                                    self.sell_cost_pct
-                        self.trades+=1
-                    else:
-                        sell_num_lots = 0
-                else:
-                    sell_num_lots = 0
-            else:
-                sell_num_lots = _do_sell_normal()
+            # increase USD balance for USD-quoted currencies, i.e. GBPUSD, EURUSD
+            # increase non-USD balance for USD-based currencies, i.e. USDCHF, USDJPY
+            self.state[quote_ccy_index] += sell_amount - cost
+
+            # deduct USD balance for USD-quoted currencies, i.e. GBPUSD, EURUSD
+            # deduct non-USD balance for USD-based currencies, i.e. USDCHF, USDJPY
+            self.state[base_ccy_index] -= sell_num_lots
+            
+            self.trades+=1
         else:
-            sell_num_lots = _do_sell_normal()
+            sell_num_lots = 0
+
 
         return sell_num_lots
 
     
     def _buy_stock(self, index, action):
 
-        def _do_buy():
-            # For USD-quoted currencies, i.e. GBPUSD, EURUSD
-            if self.usd_quoted[index]:
-                base_ccy_index = index+2*self.stock_dim+1
-                quote_ccy_index = 0
+        # For USD-quoted currencies, i.e. GBPUSD, EURUSD
+        if self.usd_quoted[index]:
+            base_ccy_index = index+2*self.stock_dim+1
+            quote_ccy_index = 0
 
-            # For USD-based currencies, i.e. USDCHF, USDJPY
-            else:  
-                base_ccy_index = 0
-                quote_ccy_index = index+2*self.stock_dim+1
+        # For USD-based currencies, i.e. USDCHF, USDJPY
+        else:  
+            base_ccy_index = 0
+            quote_ccy_index = index+2*self.stock_dim+1
 
-            close_price_index = self.stock_dim+index+1
-            close_price = self.state[close_price_index]
+        close_price_index = self.stock_dim+index+1
+        close_price = self.state[close_price_index]
 
-            # Buy only if the price is > 0 (no missing data in this particular date)
-            # Buy only if current asset is > 0
-            if self.state[index+1]>0 and self.state[quote_ccy_index]>0: 
+        # Buy only if the price is > 0 (no missing data in this particular date)
+        # Buy only if current asset is > 0
+        if self.state[index+1]>0 and self.state[quote_ccy_index]>0: 
 
-                # Quote currency balance available for buy order       
-                available_amount = self.state[quote_ccy_index] // close_price
-                
-                # Update balance
-                buy_num_lots = min(available_amount, action)
-                buy_amount = close_price * buy_num_lots * (1+ self.buy_cost_pct)
-                cost = buy_amount * self.buy_cost_pct
-                self.cost += cost
+            # Quote currency balance available for buy order       
+            available_amount = self.state[quote_ccy_index] // close_price
+            
+            # Update balance
+            buy_num_lots = min(available_amount, action)
+            buy_amount = close_price * buy_num_lots * (1+ self.buy_cost_pct)
+            cost = buy_amount * self.buy_cost_pct
+            self.cost += cost
 
-                # deduct USD balance for USD-quoted currencies, i.e. GBPUSD, EURUSD
-                # deduct non-USD balance for USD-based currencies, i.e. USDCHF, USDJPY
-                self.state[quote_ccy_index] -= buy_amount + self.cost
+            # deduct USD balance for USD-quoted currencies, i.e. GBPUSD, EURUSD
+            # deduct non-USD balance for USD-based currencies, i.e. USDCHF, USDJPY
+            self.state[quote_ccy_index] -= buy_amount + self.cost
 
-                # increase USD balance for USD-quoted currencies, i.e. GBPUSD, EURUSD
-                # increase non-USD balance for USD-based currencies, i.e. USDCHF, USDJPY
-                self.state[base_ccy_index] += buy_num_lots
+            # increase USD balance for USD-quoted currencies, i.e. GBPUSD, EURUSD
+            # increase non-USD balance for USD-based currencies, i.e. USDCHF, USDJPY
+            self.state[base_ccy_index] += buy_num_lots
 
-                self.trades+=1
-            else:
-                buy_num_lots = 0
-
-            return buy_num_lots
-
-        # perform buy action based on the sign of the action
-        if self.turbulence_threshold is None:
-            buy_num_lots = _do_buy()
+            self.trades+=1
         else:
-            if self.turbulence< self.turbulence_threshold:
-                buy_num_lots = _do_buy()
-            else:
-                buy_num_lots = 0
-                pass
+            buy_num_lots = 0
 
         return buy_num_lots
 
-    def _make_plot(self):
-        plt.plot(self.asset_memory,'r')
-        plt.savefig('results/account_value_trade_{}.png'.format(self.episode))
-        plt.close()
-
     def step(self, actions):
         self.terminal = self.timestep >= len(self.df.index.unique())-1
-        if self.terminal:
-            # print(f"Episode: {self.episode}")
-            if self.make_plots:
-                self._make_plot()            
+        if self.terminal:        
             end_total_asset = self._calculate_nop()
             df_total_value = pd.DataFrame(self.asset_memory)
             tot_reward = end_total_asset - self.initial_amount 
             self.episode_rewards.append(tot_reward)
-            df_total_value.columns = ['account_value']
-            df_total_value['date'] = self.date_memory
-            df_total_value['daily_return']=df_total_value['account_value'].pct_change(1)
-            if df_total_value['daily_return'].std() !=0:
-                sharpe = (252**0.5)*df_total_value['daily_return'].mean()/ \
-                      df_total_value['daily_return'].std()
-            df_rewards = pd.DataFrame(self.rewards_memory)
-            df_rewards.columns = ['account_rewards']
-            df_rewards['date'] = self.date_memory[:-1]
             if self.episode % self.print_verbosity == 0:
                 print(f"step: {self.timestep}, episode: {self.episode}")
-                print(f"begin_total_asset: {self.asset_memory[0]:0.2f}")
                 print(f"end_total_asset: {end_total_asset:0.2f}")
                 print(f"total_reward: {tot_reward:0.2f}")
                 print(f"total_cost: {self.cost:0.2f}")
                 print(f"total_trades: {self.trades}")
-                if df_total_value['daily_return'].std() != 0:
-                    print(f"Sharpe: {sharpe:0.3f}")
                 print("=================================")
-
-            if (self.model_name!='') and (self.mode!=''):
-                df_actions = self.save_action_memory()
-                df_actions.to_csv('results/actions_{}_{}_{}.csv'.format(self.mode,self.model_name, self.iteration))
-                df_total_value.to_csv('results/account_value_{}_{}_{}.csv'.format(self.mode,self.model_name, self.iteration),index=False)
-                df_rewards.to_csv('results/account_rewards_{}_{}_{}.csv'.format(self.mode,self.model_name, self.iteration),index=False)
-                plt.plot(self.asset_memory,'r')
-                plt.savefig('results/account_value_{}_{}_{}.png'.format(self.mode,self.model_name, self.iteration),index=False)
-                plt.close()
 
             # Add outputs to logger interface
             logger.log("environment/nop_value", end_total_asset)
@@ -306,15 +232,10 @@ class StockTradingEnv(gym.Env):
 
             self.timestep += 1
             self.data = self.df.iloc[self.timestep,:]    
-            if self.turbulence_threshold is not None:     
-                self.turbulence = self.data['turbulence'].values[0]
             self.state =  self._update_state()
                            
             end_total_asset = self._calculate_nop()
-            self.asset_memory.append(end_total_asset)
-            self.date_memory.append(self._get_date())
             self.reward = end_total_asset - begin_total_asset            
-            self.rewards_memory.append(self.reward)
             self.reward = self.reward*self.reward_scaling
 
         return self.state, self.reward, self.terminal, {}
