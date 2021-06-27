@@ -36,7 +36,6 @@ from finrl.marketdata.yahoodownloader import YahooDownloader
 from finrl.preprocessing.preprocessors import FeatureEngineer
 from finrl.preprocessing.data import data_split
 from finrl.env.env_stocktrading import StockTradingEnv
-from finrl.model.models import DRLAgent
 from finrl.trade.backtest import BackTestStats
 
 def continual_training():
@@ -184,12 +183,20 @@ def train_iteration(month: int, year: int):
         # get performance on trained environment 
         env_train, _ = e_train_gym.get_sb_env()
         train_episodes_rewards, _, train_rewards_memory_episodes = evaluate_lstm_rewards(trained_a2c, env_train, model_input_space, monthdata, deterministic=False)
+        with open(f'results/{monthdata}/train_episode_rewards.npy', 'wb') as f:
+            np.save(f, np.array(train_episodes_rewards))
+        with open(f'results/{monthdata}/train_rewards_memory.npy', 'wb') as f:
+            np.save(f, np.array(train_rewards_memory_episodes))
         
         # get performance on sampled environment from 2017
         test_env_kwargs, _, model_input_space =create_env_kwargs(test_month)
         e_test_gym = StockTradingEnv(**test_env_kwargs)
         env_test, _ = e_test_gym.get_sb_env()
         episodes_rewards, _, rewards_memory_episodes = evaluate_lstm_rewards(trained_a2c, env_test, model_input_space, monthdata, deterministic=False)
+        with open(f'results/{monthdata}/test_episode_rewards_{test_month}_17.npy', 'wb') as f:
+            np.save(f, np.array(episodes_rewards))
+        with open(f'results/{monthdata}/train_rewards_memory_{test_month}_17.npy', 'wb') as f:
+            np.save(f, np.array(rewards_memory_episodes))
 
         combined_episodes_rewards = train_episodes_rewards + episodes_rewards
         combined_rewards_memory = train_rewards_memory_episodes[0] + rewards_memory_episodes[0]
