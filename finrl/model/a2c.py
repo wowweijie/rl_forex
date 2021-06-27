@@ -299,6 +299,7 @@ class A2C(ActorCriticRLModel):
                     logger.dump_tabular()
 
         callback.on_training_end()
+        print("states -> ", states)
         return self, states
 
     def save(self, save_path, cloudpickle=False):
