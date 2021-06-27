@@ -1,6 +1,7 @@
 import time
 
 import gym
+from gym import spaces
 import numpy as np
 import tensorflow as tf
 
@@ -63,7 +64,7 @@ class A2C(ActorCriticRLModel):
         If None, the number of cpu of the current machine will be used.
     """
 
-    def __init__(self, policy, env, gamma=0.99, n_steps=5, vf_coef=0.25, ent_coef=0.01, max_grad_norm=0.5,
+    def __init__(self, policy, env, model_input_space, gamma=0.99, n_steps=5, vf_coef=0.25, ent_coef=0.01, max_grad_norm=0.5,
                  learning_rate=7e-4, alpha=0.99, momentum=0.0, epsilon=1e-5, lr_schedule='constant',
                  verbose=0, tensorboard_log=None, _init_setup_model=True, policy_kwargs=None,
                  full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None):
@@ -101,13 +102,15 @@ class A2C(ActorCriticRLModel):
         super(A2C, self).__init__(policy=policy, env=env, verbose=verbose, requires_vec_env=True,
                                   _init_setup_model=_init_setup_model, policy_kwargs=policy_kwargs,
                                   seed=seed, n_cpu_tf_sess=n_cpu_tf_sess)
+        
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape = (model_input_space,))
 
         # if we are loading, it is possible the environment is not known, however the obs and action space are known
         if _init_setup_model:
             self.setup_model()
 
     def _make_runner(self) -> AbstractEnvRunner:
-        return A2CRunner(self.env, self, n_steps=self.n_steps, gamma=self.gamma)
+        return A2CRunner(self.env, self, model_input_space=self.observation_space, n_steps=self.n_steps, gamma=self.gamma)
 
     def _get_pretrain_placeholders(self):
         policy = self.train_model
@@ -324,9 +327,65 @@ class A2C(ActorCriticRLModel):
 
         self._save_to_file(save_path, data=data, params=params_to_save, cloudpickle=cloudpickle)
 
+    @classmethod
+    def load(cls, load_path,model_input_space, env=None, custom_objects=None, **kwargs):
+        """
+        Load the model from file
+
+        :param load_path: (str or file-like) the saved parameter location
+        :param env: (Gym Environment) the new environment to run the loaded model on
+            (can be None if you only need prediction from a trained model)
+        :param custom_objects: (dict) Dictionary of objects to replace
+            upon loading. If a variable is present in this dictionary as a
+            key, it will not be deserialized and the corresponding item
+            will be used instead. Similar to custom_objects in
+            `keras.models.load_model`. Useful when you have an object in
+            file that can not be deserialized.
+        :param kwargs: extra arguments to change the model when loading
+        """
+        data, params = cls._load_from_file(load_path, custom_objects=custom_objects)
+
+        if 'policy_kwargs' in kwargs and kwargs['policy_kwargs'] != data['policy_kwargs']:
+            raise ValueError("The specified policy kwargs do not equal the stored policy kwargs. "
+                             "Stored kwargs: {}, specified kwargs: {}".format(data['policy_kwargs'],
+                                                                              kwargs['policy_kwargs']))
+
+        model = cls(policy=data["policy"], env=None, model_input_space=model_input_space, _init_setup_model=False)  # pytype: disable=not-instantiable
+        model.__dict__.update(data)
+        model.__dict__.update(kwargs)
+        model.set_env(env)
+        model.setup_model()
+
+        model.load_parameters(params)
+
+        return model
+
+    def predict(self, observation, state=None, mask=None, deterministic=False):
+        if state is None:
+            state = self.initial_state
+        if mask is None:
+            mask = [False for _ in range(self.n_envs)]
+        observation = np.array(observation)
+        # vectorized_env = self._is_vectorized_observation(observation, self.observation_space)
+
+        observation = observation.reshape((-1,) + self.observation_space.shape)
+        actions, _, states, _ = self.step(observation, state, mask, deterministic=deterministic)
+
+        clipped_actions = actions
+        # Clip the actions to avoid out of bound error
+        if isinstance(self.action_space, gym.spaces.Box):
+            clipped_actions = np.clip(actions, self.action_space.low, self.action_space.high)
+
+        # if not vectorized_env:
+        #     if state is not None:
+        #         raise ValueError("Error: The environment must be vectorized when using recurrent policies.")
+        #     clipped_actions = clipped_actions[0]
+
+        return clipped_actions, states
+
 
 class A2CRunner(AbstractEnvRunner):
-    def __init__(self, env, model, n_steps=5, gamma=0.99):
+    def __init__(self, env, model, model_input_space, n_steps=5, gamma=0.99):
         """
         A runner to learn the policy of an environment for an a2c model
 
@@ -336,6 +395,11 @@ class A2CRunner(AbstractEnvRunner):
         :param gamma: (float) Discount factor
         """
         super(A2CRunner, self).__init__(env=env, model=model, n_steps=n_steps)
+        n_envs = env.num_envs
+        self.batch_ob_shape = (n_envs * n_steps,) + model_input_space.shape
+        self.model_input_space = model_input_space
+        self.last_action = None
+        self.last_reward = None
         self.gamma = gamma
 
     def _run(self):
@@ -348,9 +412,17 @@ class A2CRunner(AbstractEnvRunner):
         mb_obs, mb_rewards, mb_actions, mb_values, mb_dones = [], [], [], [], []
         mb_states = self.states
         ep_infos = []
-        for _ in range(self.n_steps):
-            actions, values, states, _ = self.model.step(self.obs, self.states, self.dones)  # pytype: disable=attribute-error
-            mb_obs.append(np.copy(self.obs))
+        for i in range(self.n_steps):
+            
+            # meta RL - add previous action and previous reward to observation 
+            if self.last_action is not None and self.last_reward is not None:
+                meta_obs = np.concatenate([np.copy(self.obs), np.array(self.last_action), np.array([self.last_reward])], axis = 1)
+            else:
+                meta_obs = np.concatenate([np.copy(self.obs), np.zeros((1,self.model_input_space.shape[0]-self.obs.shape[1]))], axis = 1)
+
+            actions, values, states, _ = self.model.step(meta_obs, self.states, self.dones)  # pytype: disable=attribute-error
+
+            mb_obs.append(meta_obs)
             mb_actions.append(actions)
             mb_values.append(values)
             mb_dones.append(self.dones)
@@ -359,6 +431,11 @@ class A2CRunner(AbstractEnvRunner):
             if isinstance(self.env.action_space, gym.spaces.Box):
                 clipped_actions = np.clip(actions, self.env.action_space.low, self.env.action_space.high)
             obs, rewards, dones, infos = self.env.step(clipped_actions)
+            
+            # meta RL - store previous action and previous reward
+            self.last_action = clipped_actions
+            self.last_reward = rewards
+
 
             self.model.num_timesteps += self.n_envs
 
@@ -389,7 +466,12 @@ class A2CRunner(AbstractEnvRunner):
         mb_masks = mb_dones[:, :-1]
         mb_dones = mb_dones[:, 1:]
         true_rewards = np.copy(mb_rewards)
-        last_values = self.model.value(self.obs, self.states, self.dones).tolist()  # pytype: disable=attribute-error
+        # meta RL - add previous action and previous reward to observation 
+        if self.last_action is not None and self.last_reward is not None:
+            meta_obs = np.concatenate([np.copy(self.obs), np.array(self.last_action), np.array([self.last_reward])], axis = 1)
+        else:
+            meta_obs = np.concatenate([np.copy(self.obs), np.zeros((1,self.model_input_space.shape[0]-self.obs.shape[1]))], axis = 1)
+        last_values = self.model.value(meta_obs, self.states, self.dones).tolist()  # pytype: disable=attribute-error
         # discount/bootstrap off value fn
         for n, (rewards, dones, value) in enumerate(zip(mb_rewards, mb_dones, last_values)):
             rewards = rewards.tolist()
