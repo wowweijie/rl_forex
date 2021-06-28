@@ -383,6 +383,51 @@ class A2C(ActorCriticRLModel):
         #     clipped_actions = clipped_actions[0]
 
         return clipped_actions, states
+    
+    def set_env(self, env):
+        """
+        Checks the validity of the environment, and if it is coherent, set it as the current environment.
+
+        :param env: (Gym Environment) The environment for learning a policy
+        """
+        if env is None and self.env is None:
+            if self.verbose >= 1:
+                print("Loading a model without an environment, "
+                      "this model cannot be trained until it has a valid environment.")
+            return
+        elif env is None:
+            raise ValueError("Error: trying to replace the current environment with None")
+
+        
+        if self._requires_vec_env:
+            assert isinstance(env, VecEnv), \
+                "Error: the environment passed is not a vectorized environment, however {} requires it".format(
+                    self.__class__.__name__)
+            assert not self.policy.recurrent or self.n_envs == env.num_envs, \
+                "Error: the environment passed must have the same number of environments as the model was trained on." \
+                "This is due to the Lstm policy not being capable of changing the number of environments."
+            self.n_envs = env.num_envs
+        else:
+            # for models that dont want vectorized environment, check if they make sense and adapt them.
+            # Otherwise tell the user about this issue
+            if isinstance(env, VecEnv):
+                if env.num_envs == 1:
+                    env = _UnvecWrapper(env)
+                    self._vectorize_action = True
+                else:
+                    raise ValueError("Error: the model requires a non vectorized environment or a single vectorized "
+                                     "environment.")
+            else:
+                self._vectorize_action = False
+
+            self.n_envs = 1
+
+        self.env = env
+        self._vec_normalize_env = unwrap_vec_normalize(env)
+
+        # Invalidated by environment change.
+        self.episode_reward = None
+        self.ep_info_buf = None
 
 
 class A2CRunner(AbstractEnvRunner):

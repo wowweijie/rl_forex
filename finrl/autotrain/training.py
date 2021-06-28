@@ -22,6 +22,7 @@ from bayes_opt import BayesianOptimization
 from bayes_opt.logger import JSONLogger
 from bayes_opt.event import Events
 from random import sample
+from stable_baselines.common.vec_env.base_vec_env import VecEnv
 
 from finrl.config import config
 from finrl.preprocessing.preprocessors import FeatureEngineer
@@ -39,7 +40,6 @@ from finrl.env.env_stocktrading import StockTradingEnv
 from finrl.trade.backtest import BackTestStats
 
 def continual_training():
-    train_iteration(1,17)
     train_iteration(2,17)
     train_iteration(3,17)
     train_iteration(4,17)
@@ -172,11 +172,12 @@ def train_iteration(month: int, year: int):
                 )
         # use previous month's data as the first BO probe
         else:
-            model_a2c, _ = load_best(f'{str_prev_month}_{year}', model_input_space)
+            model_a2c, _ = load_best(f'{str_prev_month}_{year}', env=env_train, model_input_space=model_input_space)
             MODEL_PARAMS = {"n_steps": 20, "ent_coef": 0.001, "learning_rate": learning_rate_val, 'epsilon': epsilon}
             if bo_iter != 1:
                 for key,value in MODEL_PARAMS.items():
                     setattr(model_a2c,key,value)
+            print(model_a2c.__dict__)
 
         trained_a2c, hidden_states = model_a2c.learn(total_timesteps=total_timesteps, tb_log_name='a2c')
 
@@ -236,7 +237,7 @@ def train_iteration(month: int, year: int):
 
     # if previous month data can be found, probe existing parameters
     if os.path.isfile(f'results/{str_prev_month}_{year}/BO_logs.json'):
-        _, params = load_best(f'{str_prev_month}_{year}', model_input_space)
+        _, params = load_best(f'{str_prev_month}_{year}', env=None, model_input_space=model_input_space)
         optimizer.probe(
             params=params,
             lazy=True,
@@ -248,7 +249,7 @@ def train_iteration(month: int, year: int):
     optimizer.maximize(init_points=1, n_iter=2)
 
 
-def load_best(monthdata: str, model_input_space: int):
+def load_best(monthdata: str, env, model_input_space):
     max_target = None
     index = 0
     target_index = 0
@@ -270,7 +271,7 @@ def load_best(monthdata: str, model_input_space: int):
             index += 1
     print("best_iteration :", target_index)
     print("params:", target_params)
-    model = A2C.load(f"saved_models/{monthdata}/model-{target_index+1}", model_input_space)
+    model = A2C.load(f"saved_models/{monthdata}/model-{target_index+1}", env=env, model_input_space=model_input_space)
     return model, target_params
 
 def draw_month(current_month: int):
