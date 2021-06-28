@@ -5,9 +5,13 @@ from gym import spaces
 import numpy as np
 import tensorflow as tf
 
+from .base_class import ActorCriticRLModel
 from stable_baselines import logger
-from stable_baselines.common import explained_variance, tf_util, ActorCriticRLModel, SetVerbosity, TensorboardWriter
+from stable_baselines.common import explained_variance, tf_util, SetVerbosity, TensorboardWriter
 from stable_baselines.common.policies import ActorCriticPolicy, RecurrentActorCriticPolicy
+from stable_baselines.common.vec_env.base_vec_env import VecEnv
+from stable_baselines.common.vec_env import unwrap_vec_normalize
+from stable_baselines.common.policies import MlpLnLstmPolicy
 from stable_baselines.common.runners import AbstractEnvRunner
 from stable_baselines.common.schedules import Scheduler
 from stable_baselines.common.tf_util import mse, total_episode_reward_logger
@@ -64,7 +68,7 @@ class A2C(ActorCriticRLModel):
         If None, the number of cpu of the current machine will be used.
     """
 
-    def __init__(self, policy, env, model_input_space, gamma=0.99, n_steps=5, vf_coef=0.25, ent_coef=0.01, max_grad_norm=0.5,
+    def __init__(self, policy, env, model_input_space=None, gamma=0.99, n_steps=5, vf_coef=0.25, ent_coef=0.01, max_grad_norm=0.5,
                  learning_rate=7e-4, alpha=0.99, momentum=0.0, epsilon=1e-5, lr_schedule='constant',
                  verbose=0, tensorboard_log=None, _init_setup_model=True, policy_kwargs=None,
                  full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None):
@@ -328,38 +332,38 @@ class A2C(ActorCriticRLModel):
 
         self._save_to_file(save_path, data=data, params=params_to_save, cloudpickle=cloudpickle)
 
-    @classmethod
-    def load(cls, load_path,model_input_space, env=None, custom_objects=None, **kwargs):
-        """
-        Load the model from file
+    # @classmethod
+    # def load(cls, load_path,model_input_space, env=None, custom_objects=None, **kwargs):
+    #     """
+    #     Load the model from file
 
-        :param load_path: (str or file-like) the saved parameter location
-        :param env: (Gym Environment) the new environment to run the loaded model on
-            (can be None if you only need prediction from a trained model)
-        :param custom_objects: (dict) Dictionary of objects to replace
-            upon loading. If a variable is present in this dictionary as a
-            key, it will not be deserialized and the corresponding item
-            will be used instead. Similar to custom_objects in
-            `keras.models.load_model`. Useful when you have an object in
-            file that can not be deserialized.
-        :param kwargs: extra arguments to change the model when loading
-        """
-        data, params = cls._load_from_file(load_path, custom_objects=custom_objects)
+    #     :param load_path: (str or file-like) the saved parameter location
+    #     :param env: (Gym Environment) the new environment to run the loaded model on
+    #         (can be None if you only need prediction from a trained model)
+    #     :param custom_objects: (dict) Dictionary of objects to replace
+    #         upon loading. If a variable is present in this dictionary as a
+    #         key, it will not be deserialized and the corresponding item
+    #         will be used instead. Similar to custom_objects in
+    #         `keras.models.load_model`. Useful when you have an object in
+    #         file that can not be deserialized.
+    #     :param kwargs: extra arguments to change the model when loading
+    #     """
+    #     data, params = cls._load_from_file(load_path, custom_objects=custom_objects)
 
-        if 'policy_kwargs' in kwargs and kwargs['policy_kwargs'] != data['policy_kwargs']:
-            raise ValueError("The specified policy kwargs do not equal the stored policy kwargs. "
-                             "Stored kwargs: {}, specified kwargs: {}".format(data['policy_kwargs'],
-                                                                              kwargs['policy_kwargs']))
+    #     if 'policy_kwargs' in kwargs and kwargs['policy_kwargs'] != data['policy_kwargs']:
+    #         raise ValueError("The specified policy kwargs do not equal the stored policy kwargs. "
+    #                          "Stored kwargs: {}, specified kwargs: {}".format(data['policy_kwargs'],
+    #                                                                           kwargs['policy_kwargs']))
 
-        model = cls(policy=data["policy"], env=None, model_input_space=model_input_space, _init_setup_model=False)  # pytype: disable=not-instantiable
-        model.__dict__.update(data)
-        model.__dict__.update(kwargs)
-        model.set_env(env)
-        model.setup_model()
+    #     model = cls(policy=data["policy"], env=None, model_input_space=model_input_space, _init_setup_model=False)  # pytype: disable=not-instantiable
+    #     model.__dict__.update(data)
+    #     model.__dict__.update(kwargs)
+    #     model.set_env(env)
+    #     model.setup_model()
 
-        model.load_parameters(params)
+    #     model.load_parameters(params)
 
-        return model
+    #     return model
 
     def predict(self, observation, state=None, mask=None, deterministic=False):
         if state is None:
