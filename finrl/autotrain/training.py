@@ -136,6 +136,10 @@ def train_iteration(month: int, year: int):
 
     bo_iter = 0
     test_month = draw_month(month)
+    if test_month < 10:
+        str_test_month = "0" + str(test_month)
+    else:
+        str_test_month = str(test_month)
     
     def A2C_train(learning_rate_val, epsilon):
 
@@ -190,13 +194,13 @@ def train_iteration(month: int, year: int):
             np.save(f, np.array(train_rewards_memory_episodes))
         
         # get performance on sampled environment from 2017
-        test_env_kwargs, _, model_input_space =create_env_kwargs(test_month)
+        test_env_kwargs, _, model_input_space =create_env_kwargs(f'{str_test_month}_17')
         e_test_gym = StockTradingEnv(**test_env_kwargs)
         env_test, _ = e_test_gym.get_sb_env()
         episodes_rewards, _, rewards_memory_episodes = evaluate_lstm_rewards(trained_a2c, env_test, model_input_space, monthdata, deterministic=False)
-        with open(f'results/{monthdata}/test_episode_rewards_{test_month}_17.npy', 'wb') as f:
+        with open(f'results/{monthdata}/test_episode_rewards_{str_test_month}_17.npy', 'wb') as f:
             np.save(f, np.array(episodes_rewards))
-        with open(f'results/{monthdata}/train_rewards_memory_{test_month}_17.npy', 'wb') as f:
+        with open(f'results/{monthdata}/train_rewards_memory_{str_test_month}_17.npy', 'wb') as f:
             np.save(f, np.array(rewards_memory_episodes))
 
         combined_episodes_rewards = train_episodes_rewards + episodes_rewards
@@ -277,7 +281,7 @@ def load_best(monthdata: str, env, model_input_space):
 def draw_month(current_month: int):
     months = list(range(1,13))
     months.remove(current_month)
-    select = sample(months, 1)
+    select = sample(months, 1)[0]
     return select
 
 def train_one():
