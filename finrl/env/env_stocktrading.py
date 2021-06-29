@@ -76,10 +76,6 @@ class StockTradingEnv(gym.Env):
         self.trades = 0
         self.episode = 0
         # memorize all the total balance change
-        self.asset_memory = [self.initial_amount]
-        self.rewards_memory = []
-        self.actions_memory=[]
-        self.date_memory=[self._get_date()]
         #self.reset()
         self._seed()
 
@@ -222,11 +218,6 @@ class StockTradingEnv(gym.Env):
 
         return buy_num_lots
 
-    def _make_plot(self):
-        plt.plot(self.asset_memory,'r')
-        plt.savefig('results/account_value_trade_{}.png'.format(self.episode))
-        plt.close()
-
     def step(self, actions):
         self.terminal = self.timestep >= len(self.df.index.unique())-1
         if self.terminal:
@@ -234,37 +225,14 @@ class StockTradingEnv(gym.Env):
             if self.make_plots:
                 self._make_plot()            
             end_total_asset = self._calculate_nop()
-            df_total_value = pd.DataFrame(self.asset_memory)
             tot_reward = end_total_asset - self.initial_amount 
-            self.episode_rewards.append(tot_reward)
-            df_total_value.columns = ['account_value']
-            df_total_value['date'] = self.date_memory
-            df_total_value['daily_return']=df_total_value['account_value'].pct_change(1)
-            if df_total_value['daily_return'].std() !=0:
-                sharpe = (252**0.5)*df_total_value['daily_return'].mean()/ \
-                      df_total_value['daily_return'].std()
-            df_rewards = pd.DataFrame(self.rewards_memory)
-            df_rewards.columns = ['account_rewards']
-            df_rewards['date'] = self.date_memory[:-1]
             if self.episode % self.print_verbosity == 0:
                 print(f"step: {self.timestep}, episode: {self.episode}")
-                print(f"begin_total_asset: {self.asset_memory[0]:0.2f}")
                 print(f"end_total_asset: {end_total_asset:0.2f}")
                 print(f"total_reward: {tot_reward:0.2f}")
                 print(f"total_cost: {self.cost:0.2f}")
                 print(f"total_trades: {self.trades}")
-                if df_total_value['daily_return'].std() != 0:
-                    print(f"Sharpe: {sharpe:0.3f}")
                 print("=================================")
-
-            if (self.model_name!='') and (self.mode!=''):
-                df_actions = self.save_action_memory()
-                df_actions.to_csv('results/actions_{}_{}_{}.csv'.format(self.mode,self.model_name, self.iteration))
-                df_total_value.to_csv('results/account_value_{}_{}_{}.csv'.format(self.mode,self.model_name, self.iteration),index=False)
-                df_rewards.to_csv('results/account_rewards_{}_{}_{}.csv'.format(self.mode,self.model_name, self.iteration),index=False)
-                plt.plot(self.asset_memory,'r')
-                plt.savefig('results/account_value_{}_{}_{}.png'.format(self.mode,self.model_name, self.iteration),index=False)
-                plt.close()
 
             # Add outputs to logger interface
             logger.log("environment/nop_value", end_total_asset)
@@ -302,8 +270,6 @@ class StockTradingEnv(gym.Env):
                 # print('take buy action: {}'.format(actions[index]))
                 actions[index] = self._buy_stock(index, actions[index])
 
-            self.actions_memory.append(actions)
-
             self.timestep += 1
             self.data = self.df.iloc[self.timestep,:]    
             if self.turbulence_threshold is not None:     
@@ -311,10 +277,7 @@ class StockTradingEnv(gym.Env):
             self.state =  self._update_state()
                            
             end_total_asset = self._calculate_nop()
-            self.asset_memory.append(end_total_asset)
-            self.date_memory.append(self._get_date())
             self.reward = end_total_asset - begin_total_asset            
-            self.rewards_memory.append(self.reward)
             self.reward = self.reward*self.reward_scaling
 
         return self.state, self.reward, self.terminal, {}
@@ -323,12 +286,9 @@ class StockTradingEnv(gym.Env):
         #initiate state
         self.state = self._init_state()
         
-        if self.initial:
-            self.asset_memory = [self.initial_amount]
-        else:
+        if not self.initial:
             previous_total_asset = self.previous_state[0]+ \
             sum(np.array(self.state[1:(self.stock_dim+1)])*np.array(self.previous_state[(self.stock_dim+1):(self.stock_dim*2+1)]))
-            self.asset_memory = [previous_total_asset]
 
         self.timestep = 0
         self.data = self.df.iloc[self.timestep,:]
@@ -336,10 +296,6 @@ class StockTradingEnv(gym.Env):
         self.cost = 0
         self.trades = 0
         self.terminal = False 
-        # self.iteration=self.iteration
-        self.rewards_memory = []
-        self.actions_memory=[]
-        self.date_memory=[self._get_date()]
         
         self.episode+=1
 
@@ -407,31 +363,6 @@ class StockTradingEnv(gym.Env):
         # else:
         #     date = self.data.date
             return date
-
-    def save_asset_memory(self):
-        date_list = self.date_memory
-        asset_list = self.asset_memory
-        #print(len(date_list))
-        #print(len(asset_list))
-        df_account_value = pd.DataFrame({'date':date_list,'account_value':asset_list})
-        return df_account_value
-
-    def save_action_memory(self):
-        # if len(self.df.tic.unique())>1:
-            # date and close price length must match actions length
-            date_list = self.date_memory[:-1]
-            df_date = pd.DataFrame(date_list)
-            df_date.columns = ['date']
-            
-            action_list = self.actions_memory
-            df_actions = pd.DataFrame(action_list)
-            df_actions.columns = self.ccy_list
-            df_actions.index = df_date.date
-        # else:
-        #     date_list = self.date_memory[:-1]
-        #     action_list = self.actions_memory
-        #     df_actions = pd.DataFrame({'date':date_list,'actions':action_list})
-            return df_actions
 
     def _seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
